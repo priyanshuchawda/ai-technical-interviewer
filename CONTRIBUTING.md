@@ -17,6 +17,9 @@ Add real keys only in `.env.local`. Never commit secrets, `.env*`, or API keys i
 ```bash
 npm test
 npm run test:coverage
+npx playwright install chromium
+npm run test:e2e
+STAGING_URL=https://ai-technical-interviewer-orpin.vercel.app npm run test:staging
 npm run typecheck
 npm run lint
 npm run build

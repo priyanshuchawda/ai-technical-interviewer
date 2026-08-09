@@ -1,0 +1,22 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`interview UI copy > snapshots the required copy list 1`] = `
+[
+  "Autonomous Interviewer",
+  "Start interview",
+  "Assessment",
+  "8 questions",
+  "Candidate",
+  "Your Response",
+  "Type your technical response",
+  "⌘/Ctrl Enter to submit",
+  "Submit →",
+  "Cancel",
+  "Interview Complete",
+  "Key Strengths",
+  "Identified Gaps",
+  "Recommended Next Steps",
+  "Interview Plan",
+  "Evaluating response",
+]
+`;

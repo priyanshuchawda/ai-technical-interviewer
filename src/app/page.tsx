@@ -251,7 +251,7 @@ export default function InterviewPage() {
               <span className="live-text">{liveText}</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span className="csel-label">Candidate</span>
+              <label className="csel-label" htmlFor="candidate-selector">Candidate</label>
               <select
                 id="candidate-selector"
                 className="csel"

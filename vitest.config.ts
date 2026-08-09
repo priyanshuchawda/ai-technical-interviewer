@@ -15,16 +15,16 @@ if (fs.existsSync(".env.local")) {
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts"],
-    exclude: ["cogram-sdk-node/**", "cogram-sdk-python/**", "node_modules/**"],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    exclude: ["cogram-sdk-node/**", "cogram-sdk-python/**", "node_modules/**", "e2e/**"],
     maxConcurrency: 1,
     fileParallelism: false,
     testTimeout: 20000,
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
-      include: ["src/lib/**/*.ts"],
-      exclude: ["src/lib/**/*.test.ts", "src/lib/evals/**"],
+      include: ["src/lib/**/*.ts", "src/app/api/**/*.ts"],
+      exclude: ["**/*.test.ts", "**/*.test.tsx", "src/lib/evals/**"],
       thresholds: {
         lines: 80,
         functions: 80,

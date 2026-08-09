@@ -32,3 +32,19 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end UI
+        run: npm run test:e2e
+        env:
+          CI: true
+
+      - name: Staging smoke
+        if: github.ref == 'refs/heads/main'
+        run: npm run test:staging
+        env:
+          CI: true
+          STAGING_URL: https://ai-technical-interviewer-orpin.vercel.app
+        continue-on-error: true

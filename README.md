@@ -24,7 +24,7 @@ An enterprise-grade, stateful, multi-turn AI technical interviewer built with Ne
 - **Styling**: vanilla CSS design tokens
 - **Memory**: Breeth Graph API
 - **LLM**: Gemini for dynamic turns and feedback synthesis
-- **Testing**: Vitest unit tests with coverage gates + API integration script
+- **Testing**: Vitest unit/component/snapshot tests, golden scoring fixtures, Playwright laptop/mobile e2e, staging smoke
 
 ## Getting started
 
@@ -67,6 +67,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ```bash
 npm test
+npm run test:e2e
+STAGING_URL=https://ai-technical-interviewer-orpin.vercel.app npm run test:staging
 npm run lint
 npm run typecheck
 npm run build

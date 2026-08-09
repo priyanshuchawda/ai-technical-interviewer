@@ -8,15 +8,16 @@ describe("golden scoring fixtures", () => {
   for (const fixture of scoringFixtures) {
     it(`classifies ${fixture.label} as ${fixture.expectedOutcome}`, () => {
       const day = getCurriculumDay(fixture.day);
+      expect(day).toBeDefined();
       const outcome = classifyResponseOutcome(fixture.answer, day);
       expect(outcome).toBe(fixture.expectedOutcome);
       const evaluation = evaluateAnswer(fixture.answer, day);
       expect(evaluation.outcome).toBe(fixture.expectedOutcome);
-      if (fixture.expectedOutcome === "off_topic" || fixture.expectedOutcome === "unknown") {
-        expect(evaluation.score).toBe(0);
+      if ("maxScore" in fixture && fixture.maxScore !== undefined) {
+        expect(evaluation.score).toBeLessThanOrEqual(fixture.maxScore);
       }
-      if (fixture.expectedOutcome === "strong") {
-        expect(evaluation.score).toBeGreaterThan(0.5);
+      if ("minScore" in fixture && fixture.minScore !== undefined) {
+        expect(evaluation.score).toBeGreaterThanOrEqual(fixture.minScore);
       }
     });
   }
