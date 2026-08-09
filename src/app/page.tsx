@@ -1,132 +1,165 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { CandidateProfile, InterviewFeedback, InterviewIntelligenceState, ResponseOutcome } from "@/types/interview";
+import {
+  CandidateProfile,
+  InterviewFeedback,
+  InterviewIntelligenceState,
+  ResponseOutcome,
+} from "@/types/interview";
 import candidatesData from "../../candidates.json";
 
-const candidatesList: CandidateProfile[] = (candidatesData as { candidates: CandidateProfile[] }).candidates;
+const candidatesList: CandidateProfile[] = (
+  candidatesData as { candidates: CandidateProfile[] }
+).candidates;
 
-// ─── Outcome helpers ──────────────────────────────────────────────────────────
+// ─── helpers ──────────────────────────────────────────────────────────────────
 
-function outcomeClass(outcome: ResponseOutcome | undefined): string {
-  if (!outcome) return "";
-  return `outcome-${outcome}`;
+function obClass(o: ResponseOutcome | undefined) {
+  if (!o) return "ob ob-unknown";
+  if (o === "off_topic") return "ob ob-offtopic";
+  return `ob ob-${o}`;
 }
 
-function outcomeLabel(outcome: ResponseOutcome | undefined): string {
-  if (!outcome) return "—";
-  if (outcome === "off_topic") return "OFF TOPIC";
-  return outcome.charAt(0).toUpperCase() + outcome.slice(1);
+function obLabel(o: ResponseOutcome | undefined) {
+  if (!o) return "—";
+  if (o === "off_topic") return "Off Topic";
+  return o.charAt(0).toUpperCase() + o.slice(1);
 }
 
-function masteryFillClass(score: number): string {
-  if (score >= 0.65) return "mastery-fill-strong";
-  if (score >= 0.40) return "mastery-fill-mid";
-  return "mastery-fill-weak";
+function mbFill(s: number) {
+  if (s >= 0.65) return "mb-fill mb-green";
+  if (s >= 0.4) return "mb-fill mb-blue";
+  return "mb-fill mb-red";
+}
+function mbColor(s: number): React.CSSProperties {
+  if (s >= 0.65) return { color: "var(--green)" };
+  if (s >= 0.4) return { color: "var(--blue)" };
+  return { color: "#ef4444" };
 }
 
-function masteryScoreColor(score: number): React.CSSProperties {
-  if (score >= 0.65) return { color: "var(--green)" };
-  if (score >= 0.40) return { color: "var(--blue)" };
-  return { color: "var(--red)" };
+/** Parse backend whyThisQuestion string into labelled rows.
+ *  The backend emits lines like:
+ *  "Profile signal: Some text. Assessment strategy: More text."
+ *  We split on the known keys and render each as a labelled row. */
+function parseWhy(raw: string): Array<{ key: string; val: string }> {
+  // Try structured split on known signal prefixes
+  const prefixes = [
+    "Profile signal",
+    "Previous answer",
+    "Current mastery",
+    "Assessment strategy",
+    "Curriculum objective",
+    "Current evidence",
+  ];
+
+  // Build a regex that matches any prefix followed by ':'
+  const parts: Array<{ key: string; val: string }> = [];
+  let remaining = raw;
+
+  for (let i = 0; i < prefixes.length; i++) {
+    const key = prefixes[i];
+    const idx = remaining.indexOf(key + ":");
+    if (idx === -1) continue;
+    // anything before this key (previous segment tail) already pushed
+    const afterColon = remaining.slice(idx + key.length + 1).trim();
+    // find the next prefix
+    let end = afterColon.length;
+    for (let j = i + 1; j < prefixes.length; j++) {
+      const ni = afterColon.indexOf(prefixes[j] + ":");
+      if (ni !== -1 && ni < end) end = ni;
+    }
+    const val = afterColon.slice(0, end).replace(/\.$/, "").trim();
+    if (val) parts.push({ key, val });
+    remaining = afterColon.slice(end);
+  }
+
+  // Fallback: if nothing parsed, show raw as a single block
+  if (parts.length === 0) {
+    // Split by ". " as rough sentences
+    const sentences = raw.split(/\.\s+/).filter(Boolean);
+    if (sentences.length > 1) {
+      return sentences.slice(0, 3).map((s, i) => ({
+        key: i === 0 ? "Signal" : i === 1 ? "Strategy" : "Context",
+        val: s.replace(/\.$/, "").trim(),
+      }));
+    }
+    return [{ key: "Context", val: raw }];
+  }
+  return parts;
 }
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
+function adaptChipClass(state: string) {
+  const s = state.toLowerCase();
+  if (s.includes("deep") || s.includes("advanced")) return "adapt-chip deep";
+  if (s.includes("recovery") || s.includes("prerequisite")) return "adapt-chip recovery";
+  if (s.includes("redirect") || s.includes("off")) return "adapt-chip redirect";
+  return "adapt-chip";
+}
 
-function ProgressSegments({ filled, total }: { filled: number; total: number }) {
+// ─── sub-components ───────────────────────────────────────────────────────────
+
+function ProgressTrack({ filled, total }: { filled: number; total: number }) {
   return (
-    <div className="progress-track">
+    <div className="prog-track">
       {Array.from({ length: total }, (_, i) => (
-        <div
-          key={i}
-          className={`progress-segment ${i < filled ? "filled" : ""}`}
-        />
+        <div key={i} className={`prog-seg${i < filled ? " on" : ""}`} />
       ))}
     </div>
   );
 }
 
-function MasteryBars({ scores }: { scores: InterviewIntelligenceState["masteryScores"] }) {
-  if (scores.length === 0) return null;
+function MasteryBar({ topic, score }: { topic: string; score: number }) {
+  const pct = Math.round(score * 100);
   return (
-    <div className="mastery-bars">
-      {scores.map((m, idx) => (
-        <div key={`${m.day}-${idx}`} className="mastery-bar-row">
-          <div className="mastery-bar-meta">
-            <span className="mastery-bar-topic" title={`Day ${m.day}: ${m.topic}`}>
-              {m.topic}
-            </span>
-            <span className="mastery-bar-score" style={masteryScoreColor(m.score)}>
-              {Math.round(m.score * 100)}%
-            </span>
-          </div>
-          <div className="mastery-bar-track">
-            <div
-              className={`mastery-bar-fill ${masteryFillClass(m.score)}`}
-              style={{ width: `${Math.round(m.score * 100)}%` }}
-            />
-          </div>
-        </div>
-      ))}
+    <div className="mb-row">
+      <div className="mb-meta">
+        <span className="mb-topic" title={topic}>{topic}</span>
+        <span className="mb-score" style={mbColor(score)}>{pct}%</span>
+      </div>
+      <div className="mb-track">
+        <div className={mbFill(score)} style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }
 
-function EvaluationBlock({ evaluation }: { evaluation: NonNullable<InterviewIntelligenceState["latestEvaluation"]> }) {
-  const { outcome, score, demonstratedConcepts, missingConcepts, evidence } = evaluation;
-  const isOffTopic = outcome === "off_topic";
-
+function EvalBlock({ ev }: { ev: NonNullable<InterviewIntelligenceState["latestEvaluation"]> }) {
+  const off = ev.outcome === "off_topic";
+  const pct = Math.round(ev.score * 100);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-      {/* Outcome + score */}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-        <span className={`outcome-badge ${outcomeClass(outcome)}`}>
-          {outcomeLabel(outcome)}
-        </span>
-        {!isOffTopic && (
-          <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: 500 }}>
-            {Math.round(score * 100)}%
-          </span>
+    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <span className={obClass(ev.outcome)}>{obLabel(ev.outcome)}</span>
+        {!off && (
+          <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--ink-2)" }}>{pct}%</span>
         )}
       </div>
 
-      {/* Off-topic notice */}
-      {isOffTopic && evidence && (
-        <div className="off-topic-block">
-          <div className="off-topic-title">Off-topic response</div>
-          <div className="off-topic-desc">{evidence}</div>
+      {off && ev.evidence && (
+        <div className="ot-block">
+          <div className="ot-head">Off-topic response</div>
+          <div className="ot-body">{ev.evidence}</div>
         </div>
       )}
 
-      {/* Demonstrated */}
-      {!isOffTopic && demonstratedConcepts.length > 0 && (
+      {!off && ev.demonstratedConcepts.length > 0 && (
         <div>
-          <div style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--text-faint)", marginBottom: "4px" }}>
-            Demonstrated
-          </div>
-          <div className="concept-list">
-            {demonstratedConcepts.slice(0, 4).map((c, i) => (
-              <div key={i} className="concept-item">
-                <span className="concept-icon-green">✓</span>
-                <span>{c}</span>
-              </div>
+          <span className="eyebrow" style={{ marginBottom: "4px" }}>Demonstrated</span>
+          <div className="clist">
+            {ev.demonstratedConcepts.slice(0, 4).map((c, i) => (
+              <div key={i} className="ci"><span className="ci-g">✓</span><span>{c}</span></div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Missing */}
-      {!isOffTopic && missingConcepts.length > 0 && (
+      {!off && ev.missingConcepts.length > 0 && (
         <div>
-          <div style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--text-faint)", marginBottom: "4px" }}>
-            Missing
-          </div>
-          <div className="concept-list">
-            {missingConcepts.slice(0, 3).map((c, i) => (
-              <div key={i} className="concept-item">
-                <span className="concept-icon-amber">·</span>
-                <span>{c}</span>
-              </div>
+          <span className="eyebrow" style={{ marginBottom: "4px" }}>Missing</span>
+          <div className="clist">
+            {ev.missingConcepts.slice(0, 3).map((c, i) => (
+              <div key={i} className="ci"><span className="ci-a">·</span><span>{c}</span></div>
             ))}
           </div>
         </div>
@@ -135,22 +168,35 @@ function EvaluationBlock({ evaluation }: { evaluation: NonNullable<InterviewInte
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+function WhyBlock({ raw }: { raw: string }) {
+  const rows = parseWhy(raw);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+      {rows.map((r, i) => (
+        <div key={i} className="why-row">
+          <div className="why-key">{r.key}</div>
+          <div className="why-val">{r.val}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── main page ────────────────────────────────────────────────────────────────
 
 export default function InterviewPage() {
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateProfile>(candidatesList[0]);
-  const [sessionId, setSessionId] = useState<string>("");
+  const [sessionId, setSessionId] = useState("");
   const [messages, setMessages] = useState<Array<{ role: "interviewer" | "candidate"; content: string }>>([]);
-  const [inputMessage, setInputMessage] = useState<string>("");
-  const [isStarted, setIsStarted] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isDone, setIsDone] = useState<boolean>(false);
+  const [inputMessage, setInputMessage] = useState("");
+  const [isStarted, setIsStarted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isDone, setIsDone] = useState(false);
   const [feedback, setFeedback] = useState<InterviewFeedback | null>(null);
   const [intelligence, setIntelligence] = useState<InterviewIntelligenceState | null>(null);
 
   const transcriptRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to latest message
   useEffect(() => {
     if (transcriptRef.current) {
       transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
@@ -159,14 +205,13 @@ export default function InterviewPage() {
 
   const startInterview = async () => {
     setIsLoading(true);
-    const newSessionId = `session-${Date.now()}`;
-    setSessionId(newSessionId);
-
+    const sid = `session-${Date.now()}`;
+    setSessionId(sid);
     try {
       const res = await fetch("/api/interview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: newSessionId, candidate: selectedCandidate }),
+        body: JSON.stringify({ sessionId: sid, candidate: selectedCandidate }),
       });
       const data = await res.json();
       if (res.ok && data.reply) {
@@ -175,7 +220,7 @@ export default function InterviewPage() {
         setIsStarted(true);
       }
     } catch (err) {
-      console.error("Error starting interview:", err);
+      console.error(err);
     } finally {
       setIsLoading(false);
     }
@@ -183,21 +228,19 @@ export default function InterviewPage() {
 
   const sendTurn = async () => {
     if (!inputMessage.trim() || isLoading || isDone) return;
-
-    const userText = inputMessage;
+    const text = inputMessage;
     setInputMessage("");
-    setMessages((prev) => [...prev, { role: "candidate", content: userText }]);
+    setMessages((p) => [...p, { role: "candidate", content: text }]);
     setIsLoading(true);
-
     try {
       const res = await fetch("/api/interview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, message: userText }),
+        body: JSON.stringify({ sessionId, message: text }),
       });
       const data = await res.json();
       if (res.ok) {
-        setMessages((prev) => [...prev, { role: "interviewer", content: data.reply }]);
+        setMessages((p) => [...p, { role: "interviewer", content: data.reply }]);
         if (data.intelligence) setIntelligence(data.intelligence);
         if (data.done) {
           setIsDone(true);
@@ -205,56 +248,63 @@ export default function InterviewPage() {
         }
       }
     } catch (err) {
-      console.error("Error sending turn:", err);
+      console.error(err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-      sendTurn();
-    }
+  const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) sendTurn();
   };
 
   const m = selectedCandidate.member;
   const sig = selectedCandidate.signals;
-
-  // Progress: turn-based, cap at 8
   const totalTurns = 8;
   const currentTurn = intelligence?.progress?.turnCount ?? 0;
 
-  // Live status text
-  const liveText = isStarted ? (isDone ? "Completed" : "Live Interview") : "Ready";
-  const liveDotClass = isStarted ? (isDone ? "live-dot done" : "live-dot active") : "live-dot";
+  // live status
+  const dotClass = isStarted ? (isDone ? "live-dot done" : "live-dot active") : "live-dot";
+  const liveText = isStarted ? (isDone ? "Completed" : "Live interview") : "Ready";
+
+  // current focus day from intelligence
+  const currentDay = intelligence?.currentDay;
+
+  // mastery for the current curriculum day (if available)
+  const currentMastery = intelligence?.masteryScores.find((ms) => ms.day === currentDay);
+  const currentMasteryPct = currentMastery ? Math.round(currentMastery.score * 100) : null;
 
   return (
     <>
-      {/* ── HEADER ────────────────────────────────────────────────── */}
-      <header className="app-header">
-        <div className="app-header-inner">
-          <div className="app-brand">
-            <span className="app-brand-name">Autonomous Interviewer</span>
-            <span className="app-brand-sub">Adaptive technical assessment</span>
+      {/* ─── HEADER ─────────────────────────────────────────────────── */}
+      <header className="hdr">
+        <div className="hdr-inner">
+          <div>
+            <div className="brand-name">Autonomous Interviewer</div>
+            <div className="brand-sub">Adaptive technical assessment</div>
           </div>
-
-          <div className="app-header-right">
-            <div className="live-indicator">
-              <span className={liveDotClass} />
-              <span>{liveText}</span>
+          <div className="hdr-right">
+            {/* progress counter — visible once started */}
+            {isStarted && !isDone && (
+              <div className="hdr-progress">
+                {String(currentTurn).padStart(2, "0")} / {String(totalTurns).padStart(2, "0")}
+              </div>
+            )}
+            <div className="live-wrap">
+              <span className={dotClass} />
+              <span className="live-text">{liveText}</span>
             </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span className="candidate-select-label">Candidate</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span className="csel-label">Candidate</span>
               <select
-                className="candidate-select"
-                disabled={isStarted}
-                value={selectedCandidate.member.id}
-                onChange={(e) => {
-                  const found = candidatesList.find((c) => c.member.id === e.target.value);
-                  if (found) setSelectedCandidate(found);
-                }}
                 id="candidate-selector"
+                className="csel"
+                disabled={isStarted}
+                value={m.id}
+                onChange={(e) => {
+                  const f = candidatesList.find((c) => c.member.id === e.target.value);
+                  if (f) setSelectedCandidate(f);
+                }}
               >
                 {candidatesList.map((c) => (
                   <option key={c.member.id} value={c.member.id}>
@@ -267,55 +317,35 @@ export default function InterviewPage() {
         </div>
       </header>
 
-      {/* ── MAIN THREE-COLUMN LAYOUT ───────────────────────────────── */}
-      <main className="app-main">
+      {/* ─── WORKSPACE ──────────────────────────────────────────────── */}
+      <main className="workspace">
 
-        {/* ── LEFT: CANDIDATE CONTEXT ──────────────────────────── */}
-        <aside className="left-col panel-sticky" style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
+        {/* ── LEFT COLUMN ─────────────────────────────────────── */}
+        <aside className="sticky" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 
           {/* Candidate card */}
           <div className="panel">
-            <div className="panel-section">
-              <div className="section-label">Candidate</div>
-              <div className="candidate-name">{m.name}</div>
-              <div className="candidate-role">{m.jobRole}</div>
-              <div className="candidate-meta">
-                <div className="candidate-meta-row">
-                  <span className="meta-key">Experience</span>
-                  <span className="meta-val">{m.yearsExperience} years</span>
-                </div>
-                <div className="candidate-meta-row">
-                  <span className="meta-key">Education</span>
-                  <span className="meta-val" style={{ fontSize: "12px", textAlign: "right", maxWidth: "55%" }}>{m.education}</span>
-                </div>
+            <div className="ps">
+              <span className="eyebrow">Candidate</span>
+              <div className="cand-name">{m.name}</div>
+              <div className="cand-role">{m.jobRole}</div>
+              <div className="cand-stats">
+                <span>{m.yearsExperience} yrs experience · {m.education}</span>
+                <span style={{ marginTop: 4 }}>
+                  <strong>{sig.missionsCompleted}</strong> missions ·{" "}
+                  <strong>{sig.missionsFirstTry}</strong> first-try ·{" "}
+                  <strong>{sig.commitDays}</strong> commit days
+                </span>
               </div>
             </div>
 
-            <div className="panel-section">
-              <div className="candidate-meta">
-                <div className="candidate-meta-row">
-                  <span className="meta-key">Missions completed</span>
-                  <span className="meta-val">{sig.missionsCompleted}</span>
-                </div>
-                <div className="candidate-meta-row">
-                  <span className="meta-key">Commit days</span>
-                  <span className="meta-val">{sig.commitDays}</span>
-                </div>
-                <div className="candidate-meta-row">
-                  <span className="meta-key">First-try passes</span>
-                  <span className="meta-val">{sig.missionsFirstTry}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Start button (only before interview) */}
             {!isStarted && (
-              <div className="start-btn-wrap">
+              <div className="start-wrap">
                 <button
-                  className="start-btn"
+                  id="start-interview-btn"
+                  className="btn-start"
                   onClick={startInterview}
                   disabled={isLoading}
-                  id="start-interview-btn"
                 >
                   {isLoading ? "Initializing…" : "Start Technical Interview"}
                 </button>
@@ -323,86 +353,103 @@ export default function InterviewPage() {
             )}
           </div>
 
-          {/* Focus areas (only after start) */}
-          {isStarted && intelligence && intelligence.focusAreas.length > 0 && (
+          {/* Assessment plan — show immediately (pre-interview from profile, post-interview from intelligence) */}
+          {(intelligence?.focusAreas?.length ?? 0) > 0 ? (
             <div className="panel">
-              <div className="panel-section">
-                <div className="section-label">Interview Focus Areas</div>
-                <div className="focus-areas">
-                  {intelligence.focusAreas.slice(0, 4).map((fa, i) => (
-                    <div key={i} className="focus-area-item">
-                      <span className="focus-area-day">Day {fa.day}</span>
-                      {" · "}{fa.title}
+              <div className="ps">
+                <span className="eyebrow">Assessment Focus</span>
+                <div className="plan-list">
+                  {intelligence!.focusAreas.slice(0, 5).map((fa, i) => {
+                    const isCurrent = isStarted && fa.day === currentDay;
+                    return (
+                      <div
+                        key={fa.day}
+                        className={`plan-item ${isCurrent ? "active" : i > 0 ? "passive" : ""}`}
+                      >
+                        <span className="plan-num">{String(i + 1).padStart(2, "0")}</span>
+                        <div>
+                          <div className="plan-day">Day {fa.day}</div>
+                          <div className="plan-title">{fa.title}</div>
+                          {isCurrent && <span className="plan-badge">Current</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : !isStarted && selectedCandidate.missions.length > 0 ? (
+            /* pre-interview: show candidate mission list as assessment plan */
+            <div className="panel">
+              <div className="ps">
+                <span className="eyebrow">Assessment Focus</span>
+                <div className="plan-list">
+                  {selectedCandidate.missions.slice(0, 5).map((mis, i) => (
+                    <div key={mis.day} className={`plan-item ${i > 0 ? "passive" : ""}`}>
+                      <span className="plan-num">{String(i + 1).padStart(2, "0")}</span>
+                      <div>
+                        <div className="plan-day">Day {mis.day}</div>
+                        <div className="plan-title">{mis.title}</div>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
         </aside>
 
-        {/* ── CENTER: INTERVIEW AREA ────────────────────────────── */}
-        <div className="interview-panel">
+        {/* ── CENTER COLUMN ───────────────────────────────────── */}
+        <div className="center-col">
 
-          {/* Progress header */}
+          {/* Progress strip */}
           {isStarted && (
-            <div className="progress-header">
-              <div className="progress-meta">
-                <span className="progress-title">Technical Interview</span>
-                <span className="progress-count">
-                  Turn {currentTurn} of {totalTurns}
-                </span>
+            <div className="prog-strip">
+              <div className="prog-top">
+                <span className="prog-label">Technical Interview</span>
+                <span className="prog-count">Question {currentTurn} of {totalTurns}</span>
               </div>
-
               {intelligence && (
-                <div className="progress-day-label">
-                  <span>Day {intelligence.currentDay}</span>
+                <div className="prog-topic">
+                  <strong>Day {intelligence.currentDay}</strong>
                   {" · "}{intelligence.currentTopic}
                 </div>
               )}
-
-              <ProgressSegments
-                filled={Math.min(currentTurn, totalTurns)}
-                total={totalTurns}
-              />
+              <ProgressTrack filled={Math.min(currentTurn, totalTurns)} total={totalTurns} />
             </div>
           )}
 
-          {/* Conversation / empty state */}
-          <div className="panel conversation-panel">
+          {/* Conversation / empty */}
+          <div className="convo-panel">
             {!isStarted ? (
-              <div className="conversation-empty">
+              <div className="convo-empty">
                 <div className="empty-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                    stroke="var(--ink-4)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                   </svg>
                 </div>
                 <div>
-                  <div className="empty-title">Ready to begin</div>
-                  <div className="empty-sub">Select a candidate and click Start Technical Interview to begin the adaptive assessment.</div>
+                  <div className="empty-h">Ready to begin</div>
+                  <div className="empty-p">
+                    Select a candidate above and click <strong>Start Technical Interview</strong> to begin the adaptive assessment.
+                  </div>
                 </div>
               </div>
             ) : (
-              <div className="conversation-transcript" ref={transcriptRef}>
+              <div className="transcript" ref={transcriptRef}>
                 {messages.map((msg, idx) => {
-                  const isInterviewer = msg.role === "interviewer";
-                  const isLatestInterviewer = isInterviewer && idx === messages.length - 1 && !isLoading;
-
+                  const isByInterviewer = msg.role === "interviewer";
+                  const isLatest = isByInterviewer && idx === messages.length - 1 && !isLoading;
                   return (
                     <div
                       key={idx}
-                      className={`transcript-msg ${!isInterviewer ? "msg-candidate-wrap" : ""}`}
+                      className={`t-msg${!isByInterviewer ? " t-cand" : ""}`}
                     >
-                      <div className="msg-label">
-                        {isInterviewer ? "Interviewer" : m.name}
+                      <div className="t-who">
+                        {isByInterviewer ? "Interviewer" : m.name}
                       </div>
-                      <div
-                        className={
-                          isInterviewer
-                            ? `msg-interviewer${isLatestInterviewer ? " latest" : ""}`
-                            : "msg-candidate"
-                        }
-                      >
+                      <div className={`t-bubble${isLatest ? " highlight" : ""}`}>
                         {msg.content}
                       </div>
                     </div>
@@ -410,13 +457,13 @@ export default function InterviewPage() {
                 })}
 
                 {isLoading && (
-                  <div className="transcript-msg">
-                    <div className="msg-label">Interviewer</div>
-                    <div className="loading-row">
-                      <div className="loading-dots">
-                        <div className="loading-dot" />
-                        <div className="loading-dot" />
-                        <div className="loading-dot" />
+                  <div className="t-msg">
+                    <div className="t-who">Interviewer</div>
+                    <div className="loading-indicator">
+                      <div className="ldots">
+                        <div className="ldot" />
+                        <div className="ldot" />
+                        <div className="ldot" />
                       </div>
                       <span>Evaluating response…</span>
                     </div>
@@ -426,66 +473,60 @@ export default function InterviewPage() {
             )}
           </div>
 
-          {/* Answer input area */}
+          {/* Answer area */}
           {isStarted && !isDone && (
             <div className="answer-area">
+              <div className="answer-label">Your Response</div>
               <textarea
                 id="answer-input"
-                className="answer-textarea"
+                className="answer-ta"
                 placeholder="Type your technical response…"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                onKeyDown={handleKeyDown}
+                onKeyDown={handleKey}
                 disabled={isLoading}
                 rows={4}
               />
-              <div className="answer-actions">
+              <div className="answer-row">
                 <span className="answer-hint">⌘ Enter to submit</span>
                 <button
                   id="submit-response-btn"
-                  className="btn btn-primary"
+                  className="btn-submit"
                   onClick={sendTurn}
                   disabled={isLoading || !inputMessage.trim()}
                 >
-                  {isLoading ? "Evaluating…" : "Submit Response"}
+                  {isLoading ? "Evaluating…" : "Submit response →"}
                 </button>
               </div>
             </div>
           )}
 
-          {/* Final feedback panel */}
+          {/* Final feedback */}
           {isDone && feedback && (
-            <div className="feedback-panel">
-              <div className="feedback-header">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--green-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12"/>
+            <div className="feedback-wrap">
+              <div className="fb-head">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  stroke="var(--green-text)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
                 </svg>
-                <span className="feedback-header-title">Interview Complete — Assessment Feedback</span>
+                Interview Complete — Assessment Feedback
               </div>
-              <div className="feedback-body">
-                <p className="feedback-summary">{feedback.summary}</p>
-
-                <div className="feedback-grid">
+              <div className="fb-body">
+                <p className="fb-summary">{feedback.summary}</p>
+                <div className="fb-grid">
                   <div>
-                    <div className="feedback-col-label green">Key Strengths</div>
-                    <ul className="feedback-list">
-                      {feedback.strengths.map((s, i) => <li key={i}>{s}</li>)}
-                    </ul>
+                    <div className="fb-col-lbl g">Key Strengths</div>
+                    <ul className="fb-list">{feedback.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul>
                   </div>
                   <div>
-                    <div className="feedback-col-label amber">Identified Gaps</div>
-                    <ul className="feedback-list">
-                      {feedback.gaps.map((g, i) => <li key={i}>{g}</li>)}
-                    </ul>
+                    <div className="fb-col-lbl a">Identified Gaps</div>
+                    <ul className="fb-list">{feedback.gaps.map((g, i) => <li key={i}>{g}</li>)}</ul>
                   </div>
                 </div>
-
                 {feedback.next.length > 0 && (
                   <div>
-                    <div className="feedback-col-label blue">Recommended Next Steps</div>
-                    <ul className="feedback-list">
-                      {feedback.next.map((n, i) => <li key={i}>{n}</li>)}
-                    </ul>
+                    <div className="fb-col-lbl b">Recommended Next Steps</div>
+                    <ul className="fb-list">{feedback.next.map((n, i) => <li key={i}>{n}</li>)}</ul>
                   </div>
                 )}
               </div>
@@ -493,56 +534,98 @@ export default function InterviewPage() {
           )}
         </div>
 
-        {/* ── RIGHT: INTERVIEW INTELLIGENCE ────────────────────── */}
-        <aside className="right-col panel-sticky">
-          <div className="panel intelligence-panel">
+        {/* ── RIGHT COLUMN — INTELLIGENCE ─────────────────────── */}
+        <aside className="sticky">
+          <div className="panel intel-col">
 
             {!isStarted ? (
-              <div className="panel-section">
-                <div className="section-label">Interview Intelligence</div>
-                <p className="intel-empty">
-                  Live assessment signals will appear here once the interview begins.
+              <div className="ps">
+                <span className="eyebrow">Interview Intelligence</span>
+                <p className="intel-ph">
+                  Live assessment signals, adaptive state, topic mastery and Breeth memory context
+                  will appear here once the interview begins.
                 </p>
               </div>
-            ) : intelligence ? (
+            ) : !intelligence ? null : (
               <>
                 {/* Current focus */}
-                <div className="panel-section">
-                  <div className="section-label">Interview Intelligence</div>
-                  <div style={{ marginBottom: "var(--space-1)" }}>
-                    <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>
-                      Day {intelligence.currentDay}
-                    </span>
+                <div className="ps">
+                  <span className="eyebrow">Interview Intelligence</span>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "var(--ink-1)", marginBottom: 1 }}>
+                    Day {intelligence.currentDay}
                   </div>
-                  <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "var(--space-3)" }}>
+                  <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 8 }}>
                     {intelligence.currentTopic}
                   </div>
-                  <span className="diff-chip">{intelligence.difficultyState}</span>
+                  <span className={adaptChipClass(intelligence.difficultyState)}>
+                    {intelligence.difficultyState}
+                  </span>
                 </div>
+
+                {/* Mastery for current topic */}
+                {currentMasteryPct !== null && (
+                  <>
+                    <div className="divider" />
+                    <div className="ps">
+                      <span className="eyebrow">Mastery</span>
+                      <div className="mastery-num">{currentMasteryPct}%</div>
+                      <div className="mastery-num-track">
+                        <div
+                          className={mbFill(currentMastery!.score)}
+                          style={{ width: `${currentMasteryPct}%` }}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {/* Latest evaluation */}
                 {intelligence.latestEvaluation && (
-                  <div className="panel-section">
-                    <div className="section-label">Latest Evaluation</div>
-                    <EvaluationBlock evaluation={intelligence.latestEvaluation} />
-                  </div>
+                  <>
+                    <div className="divider" />
+                    <div className="ps">
+                      <span className="eyebrow">Latest Evaluation</span>
+                      <EvalBlock ev={intelligence.latestEvaluation} />
+                    </div>
+                  </>
                 )}
 
-                {/* Mastery scores */}
+                {/* All topic mastery bars */}
                 {intelligence.masteryScores.length > 0 && (
-                  <div className="panel-section">
-                    <div className="section-label">Topic Mastery</div>
-                    <MasteryBars scores={intelligence.masteryScores} />
-                  </div>
+                  <>
+                    <div className="divider" />
+                    <div className="ps">
+                      <span className="eyebrow">Topic Mastery</span>
+                      {intelligence.masteryScores.map((ms, i) => (
+                        <MasteryBar key={`${ms.day}-${i}`} topic={ms.topic} score={ms.score} />
+                      ))}
+                    </div>
+                  </>
                 )}
 
                 {/* Why this question */}
-                <div className="panel-section why-section">
-                  <div className="section-label">Why This Question?</div>
-                  <p className="why-body">{intelligence.whyThisQuestion}</p>
+                <div className="divider" />
+                <div className="ps">
+                  <span className="eyebrow">Why This Question?</span>
+                  <WhyBlock raw={intelligence.whyThisQuestion} />
+                </div>
+
+                {/* Breeth memory context */}
+                <div className="divider" />
+                <div className="ps">
+                  <span className="eyebrow">Memory Context</span>
+                  <div className="breeth-row">
+                    <span className="breeth-dot" />
+                    <span className="breeth-name">Breeth Graph Memory</span>
+                  </div>
+                  <div className="breeth-count">
+                    {intelligence.masteryScores.length > 0
+                      ? `${intelligence.masteryScores.length} topic${intelligence.masteryScores.length !== 1 ? "s" : ""} in session memory`
+                      : "Memory indexing active"}
+                  </div>
                 </div>
               </>
-            ) : null}
+            )}
           </div>
         </aside>
       </main>

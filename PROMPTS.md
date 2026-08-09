@@ -492,3 +492,42 @@ TESTING: run npm test and npm run build.
 
 GIT: git commit -m "feat: redesign interviewer interface" and push to https://github.com/priyanshuchawda/autonomous-ai-interviewer
 ```
+
+## Interview Workspace UI Refinement Prompt
+```
+Redesign the CURRENT Autonomous AI Interviewer frontend based on the existing implementation and the current UI.
+
+This is a visual/UX refinement pass, NOT a backend rewrite.
+
+The current redesign is much better than the original, but it still feels like a plain admin dashboard.
+The goal: "An intelligent technical interview workspace with visible adaptive intelligence."
+
+CURRENT UI PROBLEMS TO FIX:
+1. The central question area is unnecessarily tall and creates a large amount of dead space.
+2. The interview question does not have enough visual hierarchy.
+3. The candidate sidebar contains too much metadata and competes with the interview itself.
+4. The Interview Intelligence panel is too empty despite the backend providing substantial intelligence.
+5. "Why this question?" is rendered as a long backend-style sentence rather than structured product information.
+6. Interview Focus Areas look like a list of unrelated buttons instead of a prioritized assessment plan.
+7. Interview progress is not prominent enough.
+8. The UI currently looks like three cards placed next to each other rather than one cohesive interview workspace.
+9. Breeth Graph Memory is not visually apparent even though it is an important differentiating part of the system.
+10. The overall UI is clean but too generic. It needs a stronger product identity.
+
+DESIGN DIRECTION: Light theme, warmer neutrals, one restrained blue accent, semantic green/amber/red.
+No purple, no gradients, no glow, no glassmorphism.
+
+KEY IMPLEMENTATION REQUIREMENTS:
+- Compress left candidate panel; show name, role, compact stats in one line
+- Transform focus areas into a numbered assessment plan with current-day highlight
+- Center column is the visual hero: progress strip, then transcript, then answer area, immediately adjacent
+- Intelligence panel: current mastery big number, full eval block, all topic mastery bars, structured WhyBlock parser, Breeth memory section
+- WhyBlock: parse "Profile signal:", "Previous answer:", "Assessment strategy:" etc. into labelled rows
+- Breeth: show dot indicator + "Breeth Graph Memory" + session memory count
+- Adaptive state chip: styled differently for deep/recovery/redirect states
+- Progress 00/08 counter in header when live
+
+ALL BACKEND STATE PRESERVED: POST /api/interview, sessionId, candidate selection, adaptive questioning, Breeth, off-topic, mastery, canonical curriculum mappings, evidence feedback.
+
+GIT: git commit -m "feat: refine interview workspace UI" and push.
+```
