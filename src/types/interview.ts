@@ -27,6 +27,21 @@ export interface CandidateProfile {
   signals: CandidateSignals;
 }
 
+export interface CandidateIntelligenceProfile {
+  candidateId: string;
+  candidateName: string;
+  seniorityContext: string;
+  strongAreas: string[];
+  weakAreas: string[];
+  skippedAreas: string[];
+  highAttemptTopics: string[];
+  recommendedFocusAreas: Array<{
+    day: number;
+    title: string;
+    reason: string;
+  }>;
+}
+
 export interface CurriculumDay {
   day: number;
   title: string;
@@ -94,4 +109,5 @@ export interface InterviewSessionState {
   currentQuestionDay?: number;
   done: boolean;
   feedback?: InterviewFeedback;
+  intelligenceProfile?: CandidateIntelligenceProfile;
 }
