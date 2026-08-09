@@ -1727,3 +1727,881 @@ Do not provide a vague "UI improved" summary.
 
 Explain exactly what changed.
 
+
+
+## Implementation brief — opportunistic coding
+
+CONTINUE DEVELOPMENT OF THE CURRENT AUTONOMOUS AI INTERVIEWER.
+
+IMPORTANT:
+Do NOT redesign the application.
+Do NOT replace the existing interview engine.
+Do NOT remove existing deterministic evaluation, adaptive questioning,
+Breeth memory, voice, security, or final assessment functionality.
+
+We are implementing ONE final major behavioral improvement:
+
+MAKE CODING AN OPPORTUNISTIC PART OF THE TECHNICAL INTERVIEW, NOT A
+PREDEFINED CODING TASK THAT APPEARS FOR EVERY RELEVANT CURRICULUM TOPIC.
+
+The desired experience is:
+
+    conversation
+        ↓
+    candidate technical answer
+        ↓
+    evidence evaluation
+        ↓
+    interviewer decides whether practical validation is useful
+        ↓
+    IF useful:
+        "Let's make that concrete."
+        ↓
+    small contextual coding task
+        ↓
+    candidate implements
+        ↓
+    deterministic evaluation
+        ↓
+    coding evidence
+        ↓
+    interviewer discusses implementation
+        ↓
+    interview continues
+
+Coding must feel like something a real technical interviewer would
+introduce naturally.
+
+============================================================
+CURRENT PROBLEM
+============================================================
+
+The current UI can expose an "Implementation check" / "Open coding task"
+for relevant curriculum topics.
+
+This makes coding feel attached to the curriculum rather than attached
+to the conversation.
+
+For example:
+
+Question:
+"How would you design observability for an LLM application?"
+
+Candidate:
+"I'd use correlation IDs, distributed tracing, latency metrics..."
+
+Current behavior may immediately expose:
+
+"Implementation check
+Test this concept in code
+Optional · relevant to this topic"
+
+We do NOT want coding to appear automatically simply because the topic
+has a coding task.
+
+Instead:
+
+The interviewer should first evaluate the candidate's answer.
+
+Then determine whether a practical implementation would provide useful
+additional evidence.
+
+============================================================
+CORE PRODUCT PRINCIPLE
+============================================================
+
+CODING IS OPPORTUNISTIC, NOT MANDATORY.
+
+The candidate should experience:
+
+    technical conversation
+        ↓
+    challenge / follow-up
+        ↓
+    practical validation ONLY WHEN USEFUL
+
+NOT:
+
+    curriculum topic
+        ↓
+    coding task
+        ↓
+    curriculum topic
+        ↓
+    coding task
+
+For a normal 8-question interview, approximately ONE coding assessment
+is expected in a typical run, with zero being completely valid if the
+conversation does not naturally justify one.
+
+Do NOT force coding into every interview.
+
+Do NOT force coding into every topic.
+
+Do NOT show a coding task merely because a curriculum day has a coding
+task associated with it.
+
+============================================================
+WHEN CODING SHOULD BE OFFERED
+============================================================
+
+A coding task should be considered when ALL/most of the following are
+true:
+
+1. The candidate has made a concrete technical claim.
+2. The claim is practically testable.
+3. Implementation would provide stronger evidence than another purely
+   conversational question.
+4. The task can be kept small and focused.
+5. The task is directly connected to what the candidate just discussed.
+6. The candidate has not already completed a coding assessment recently
+   in the same interview unless there is a strong reason.
+
+Examples:
+
+OBSERVABILITY
+
+Candidate:
+"I'd use structured logging and correlation IDs to trace requests."
+
+Possible interviewer behavior:
+
+"That's a good approach. Let's make that concrete for a moment. Can you
+instrument this small Python function to capture latency and failures?"
+
+EMBEDDINGS
+
+Candidate:
+"I'd calculate cosine similarity between normalized vectors."
+
+Possible practical check:
+
+"Let's make that concrete. Can you implement cosine similarity for two
+vectors?"
+
+RAG
+
+Candidate:
+"I'd chunk documents based on semantic boundaries and overlap."
+
+Possible practical check:
+
+"Can you implement a small chunking function that preserves overlap
+between chunks?"
+
+RETRY / API DESIGN
+
+Candidate:
+"I'd use exponential backoff for transient failures."
+
+Possible practical check:
+
+"Can you implement a small retry wrapper with exponential backoff?"
+
+KUBERNETES
+
+Do NOT automatically create a large Kubernetes coding task.
+
+Prefer a small implementation or configuration reasoning task only if
+it genuinely provides useful evidence.
+
+============================================================
+WHEN CODING SHOULD NOT BE OFFERED
+============================================================
+
+Do NOT create a coding task when:
+
+- The candidate's answer is purely conceptual and another question would
+  better evaluate their reasoning.
+- The topic is not meaningfully implementable in a small task.
+- The candidate is struggling and needs a prerequisite/recovery question.
+- The candidate is already being evaluated through a strong practical
+  signal.
+- A coding task would interrupt an important conversational thread.
+- The interview has already gathered sufficient practical evidence.
+- The task would require a large project or excessive setup.
+
+For example:
+
+Candidate:
+"I'm not sure how distributed tracing works."
+
+The interviewer should NOT immediately respond:
+
+"Here's a coding task."
+
+Instead:
+
+"That's okay. Let's start simpler. What information would you want to
+attach to a request so you could follow it across services?"
+
+Recovery first.
+
+============================================================
+GEMINI'S ROLE
+============================================================
+
+Gemini should help generate contextual coding tasks when the interviewer
+decides that practical validation is appropriate.
+
+Gemini should NOT decide the final correctness of candidate code.
+
+Gemini should generate a STRUCTURED coding-task specification.
+
+Create a strict schema, validated with Zod, approximately:
+
+{
+  "title": string,
+  "language": "python" | "javascript" | "typescript",
+  "context": string,
+  "whyThisTask": string,
+  "instructions": string[],
+  "starterCode": string,
+  "functionSignature": string,
+  "evaluationCriteria": string[],
+  "difficulty": "basic" | "intermediate" | "advanced",
+  "estimatedMinutes": number
+}
+
+The exact schema can be adjusted to fit the existing codebase.
+
+The generated task MUST:
+
+- be directly grounded in the current conversation
+- test one technical concept
+- be small enough for approximately 5–15 minutes
+- have an explicit function/interface contract
+- have deterministic evaluation criteria
+- avoid arbitrary external dependencies
+- avoid requiring internet access
+- avoid requiring API credentials
+- avoid requiring a large project
+- be safe to run through the existing deterministic/static evaluator
+
+============================================================
+IMPORTANT: GEMINI MUST NOT GENERATE UNSAFE EXECUTION
+============================================================
+
+Do NOT introduce arbitrary remote code execution.
+
+The existing deterministic/static coding evaluation architecture must
+remain isolated.
+
+Generated code must be evaluated through the existing safe mechanism.
+
+Do not create a system where Gemini-generated code is blindly executed
+on the Next.js server.
+
+If a generated task cannot safely be evaluated deterministically,
+reject it and use a known-good fallback task.
+
+============================================================
+TASK VALIDATION / FALLBACK
+============================================================
+
+Because Gemini-generated coding tasks can be malformed, implement a
+validation pipeline:
+
+Gemini
+  ↓
+Structured JSON
+  ↓
+Zod validation
+  ↓
+Task contract validation
+  ↓
+Evaluator compatibility validation
+  ↓
+Candidate UI
+
+If generation fails, times out, returns malformed data, or creates a task
+that cannot be deterministically evaluated:
+
+    use an existing known-good coding task
+
+The interview must never fail because coding-task generation failed.
+
+Coding is optional.
+
+============================================================
+EXISTING CODING TASKS
+============================================================
+
+Do NOT delete the current predefined coding tasks.
+
+Convert them into:
+
+1. Known-good fallback tasks.
+2. Regression fixtures.
+3. Examples that help define the generated-task contract.
+
+The existing tasks should remain deterministic and tested.
+
+============================================================
+CANDIDATE-FACING UX
+============================================================
+
+Remove the feeling that coding is permanently attached to every question.
+
+Do NOT show:
+
+"Implementation check
+Test this concept in code
+Optional · relevant to this topic"
+
+on every relevant question.
+
+Instead, only show a coding opportunity after the interviewer has
+actually decided it is useful.
+
+The interaction should feel like:
+
+Interviewer:
+
+"That's a good approach. Let's make that concrete for a moment."
+
+Then a compact action/card:
+
+    Practical check
+    5–10 min · Python
+
+    Instrument a production request
+
+    Based on what you just described, implement the missing
+    instrumentation around this function.
+
+    [Start implementation]
+
+The wording should feel like a real interviewer, not an AI product.
+
+Avoid:
+
+- "AI-powered"
+- "Unlock your technical potential"
+- "Mastery"
+- "Assessment intelligence"
+- "Let's test your knowledge"
+- excessive badges
+- excessive explanation
+- generic AI marketing copy
+
+============================================================
+CODING TASK PRESENTATION
+============================================================
+
+When opened, the coding workspace should clearly explain:
+
+1. WHY this task is being introduced.
+2. WHAT the candidate needs to implement.
+3. WHAT interface/function they should preserve.
+4. WHAT technical behaviors are being evaluated.
+5. HOW MUCH TIME it should approximately take.
+
+Example:
+
+--------------------------------------------------
+
+Practical check
+
+Instrument a production request
+
+Why:
+You mentioned structured logging and latency measurement. Let's make
+that concrete with a small implementation.
+
+Your task:
+Add instrumentation around the provided process_request() function.
+
+Requirements:
+• Measure execution time.
+• Emit a structured completion event.
+• Record failures without swallowing the original exception.
+
+Time:
+5–10 minutes
+
+Python
+
+[ code editor ]
+
+[Run checks]
+
+--------------------------------------------------
+
+Do NOT expose implementation details such as:
+
+"deterministic runner"
+
+"static analyzer"
+
+"internal evaluator"
+
+Those are system details, not candidate-facing content.
+
+============================================================
+FUNCTION CONTRACT
+============================================================
+
+This is important because a previous manual test exposed a bug where:
+
+3/4 checks passed
+
+✓ timing measurement
+✓ structured event
+✓ failure path
+✗ function signature
+
+The candidate had correctly implemented:
+
+def process_request():
+
+but the evaluator expected an undocumented signature.
+
+This MUST NOT happen.
+
+Every coding task must have an explicit contract.
+
+If the evaluator checks a function signature:
+
+- the starter code must contain it
+- the candidate-facing instructions must make it clear
+- the generated task schema must contain it
+- the deterministic evaluator must use the same contract
+
+Add regression tests ensuring a correct implementation of the displayed
+task requirements passes all checks.
+
+============================================================
+DETERMINISTIC EVALUATION
+============================================================
+
+Keep deterministic evaluation as the source of truth for correctness.
+
+Gemini may generate:
+
+- task description
+- context
+- starter code
+- evaluation criteria
+
+But Gemini must NOT determine:
+
+"candidate passed"
+
+or
+
+"candidate failed"
+
+The deterministic evaluator determines:
+
+- passed requirements
+- failed requirements
+- evidence
+- implementation score
+- missing concepts
+
+Example:
+
+Candidate implementation:
+
+✓ latency measurement
+✓ structured logging
+✗ exception propagation
+
+Result:
+
+PARTIAL
+
+Missing:
+Exception propagation
+
+This becomes structured interview evidence.
+
+============================================================
+CODING RESULT → INTERVIEW EVIDENCE
+============================================================
+
+This is one of the most important requirements.
+
+A coding result must NOT remain a UI-only event.
+
+When the candidate submits the coding task, create structured evidence
+containing at minimum:
+
+- task title
+- concept tested
+- language
+- result
+- score
+- passed requirements
+- failed requirements
+- demonstrated concepts
+- missing concepts
+- execution/check metadata where useful
+
+Store it in the interview session.
+
+The next interviewer turn must have access to this evidence.
+
+============================================================
+CODING → FOLLOW-UP CONVERSATION
+============================================================
+
+After the coding task, the interviewer should naturally discuss the
+implementation.
+
+For example:
+
+Candidate passes:
+
+"Your implementation handles the request path correctly. How would you
+change it if the telemetry backend became unavailable?"
+
+Candidate misses exception handling:
+
+"Your timing and logging are solid. One thing I'd change is the exception
+path. How would you preserve the original failure after recording it?"
+
+This should feel like a human interviewer reviewing the candidate's work.
+
+Do NOT simply say:
+
+"Your coding score is 67%."
+
+The candidate should experience a conversation.
+
+============================================================
+ADAPTIVE ENGINE INTEGRATION
+============================================================
+
+Coding evidence must become another evidence source alongside:
+
+- spoken answer evidence
+- candidate history
+- Breeth memory
+- topic mastery
+- previous evaluations
+
+The adaptive engine can use coding evidence when selecting the next
+question.
+
+Example:
+
+spoken answer
+    ↓
+candidate claims concept
+    ↓
+coding validation
+    ↓
+implementation passes
+    ↓
+concept becomes stronger evidence
+
+OR:
+
+spoken answer
+    ↓
+coding validation
+    ↓
+implementation fails
+    ↓
+concept remains partially demonstrated
+    ↓
+targeted follow-up
+
+Do NOT automatically change curriculum topics because a coding task
+exists.
+
+Do NOT let coding override strong contradictory conversational evidence
+without reason.
+
+============================================================
+CODING FREQUENCY
+============================================================
+
+Coding should be controlled by the interview state.
+
+For an 8-turn interview:
+
+- 0 coding tasks is valid.
+- 1 coding task is typical.
+- 2 may occur if strongly justified.
+- Do not repeatedly offer coding every turn.
+
+Add explicit state such as:
+
+codingAssessmentsCompleted
+
+or equivalent.
+
+Prevent repeated coding offers for the same topic unless intentionally
+requested by the adaptive engine.
+
+============================================================
+INTERVIEWER PROMPTING
+============================================================
+
+Improve interviewer prompts so coding is introduced conversationally.
+
+Preferred:
+
+"That's a good approach. Let's make that concrete for a moment."
+
+"Can you implement a small version of that?"
+
+"Rather than just discussing it, I'd like to see how you'd approach the
+implementation."
+
+Avoid:
+
+"Let's test your knowledge with a coding assessment."
+
+"Your next coding challenge is..."
+
+"Now you must complete an implementation task."
+
+============================================================
+VOICE
+============================================================
+
+Preserve the existing voice-to-text system.
+
+Coding must work equally well after a spoken answer.
+
+Do not break:
+
+- SpeechRecognition
+- interim transcript
+- editable transcript
+- microphone permission handling
+- error states
+- manual submission
+
+============================================================
+ASSESSOR VIEW
+============================================================
+
+The assessor should be able to see coding evidence separately from
+spoken-answer evidence.
+
+For example:
+
+PRACTICAL EVIDENCE
+
+Instrument a production request
+Python · 4/4 checks passed
+
+Demonstrated:
+✓ latency measurement
+✓ structured logging
+✓ failure handling
+
+Confidence:
+High
+
+If partial:
+
+2/4 checks passed
+
+Missing:
+• exception propagation
+
+Do not expose unnecessary internal implementation details.
+
+============================================================
+FINAL FEEDBACK
+============================================================
+
+Coding evidence must feed into the existing evidence-backed feedback
+generator.
+
+The final report should be able to distinguish:
+
+Spoken evidence
+
+and
+
+Practical evidence
+
+A candidate should not be called strong at a concept merely because they
+said the right words if the practical implementation contradicted that
+claim.
+
+Likewise, a coding failure should not erase strong conceptual knowledge.
+
+The final assessment should synthesize both evidence types.
+
+============================================================
+TESTING
+============================================================
+
+Add focused tests.
+
+At minimum:
+
+1. Coding is NOT automatically offered for every relevant topic.
+
+2. Strong conceptual answer can trigger a coding opportunity when
+   practical validation is appropriate.
+
+3. Weak/unknown answer does not immediately trigger coding when recovery
+   is more appropriate.
+
+4. Coding task is generated from the current conversation/topic.
+
+5. Generated task passes Zod/schema validation.
+
+6. Invalid Gemini-generated task falls back safely.
+
+7. Coding task has an explicit function/interface contract.
+
+8. Correct implementation passes deterministic evaluation.
+
+9. Partial implementation produces partial evidence.
+
+10. Coding evidence is stored in session state.
+
+11. Coding evidence reaches the next interviewer prompt.
+
+12. Successful coding evidence can support a deeper follow-up.
+
+13. Failed coding evidence can trigger a targeted follow-up.
+
+14. Coding is not repeatedly offered every turn.
+
+15. Coding evidence appears in the assessor drawer.
+
+16. Coding evidence appears correctly in final feedback.
+
+17. Existing coding tasks still work as deterministic fallback fixtures.
+
+18. No arbitrary candidate code is remotely executed.
+
+============================================================
+DO NOT BREAK EXISTING FEATURES
+============================================================
+
+Preserve all existing functionality:
+
+- Candidate profiler
+- Adaptive questioning
+- Strong/partial/weak/unknown/off-topic classification
+- Same-topic deep probing
+- Recovery behavior
+- Off-topic redirect
+- Canonical curriculum mapping
+- Topic mastery
+- Breeth Graph Memory
+- Gemini interviewer
+- Evidence-backed feedback
+- Voice transcription
+- Security
+- CSRF
+- rate limiting
+- session management
+- coding workspace
+- dark/light green theme
+- assessor drawer
+- final technical assessment
+- Vercel deployment architecture
+
+============================================================
+IMPLEMENTATION PROCESS
+============================================================
+
+Before editing:
+
+1. Inspect current codingTasks.ts.
+2. Inspect current coding evaluator.
+3. Inspect interviewEngine.ts.
+4. Inspect interview state/types.
+5. Inspect prompts.ts.
+6. Inspect page.tsx coding UI.
+7. Inspect existing coding tests.
+8. Inspect existing adaptive trajectory tests.
+
+Then design the smallest architecture that satisfies this specification.
+
+Do NOT rewrite the entire application.
+
+Do NOT introduce a new state-management library.
+
+Do NOT introduce a new database.
+
+Do NOT add arbitrary dependencies unless genuinely necessary.
+
+============================================================
+VALIDATION
+============================================================
+
+Run focused tests first.
+
+Then:
+
+npm run typecheck
+
+Then:
+
+npm run lint
+
+Then:
+
+npm run build
+
+Only after focused tests are stable should you run the full test suite.
+
+Do not make real Gemini/Breeth calls from deterministic unit tests.
+
+Use mocks/fixtures.
+
+If the full suite exceeds the environment timeout, report the exact
+result rather than endlessly increasing timeouts.
+
+============================================================
+PROMPTS.MD
+============================================================
+
+Append this implementation brief to PROMPTS.md.
+
+Do not put API keys, secrets, tokens, .env values, or credentials in
+PROMPTS.md.
+
+============================================================
+GIT
+============================================================
+
+Do not reset or discard existing work.
+
+Commit only the focused implementation changes.
+
+Suggested commit:
+
+feat: make coding adaptive to interview evidence
+
+Push only if repository authentication is available.
+
+If push fails, report the exact error.
+
+============================================================
+FINAL REPORT
+============================================================
+
+At the end report:
+
+- files changed
+- architecture implemented
+- how coding decisions are made
+- how Gemini-generated tasks are validated
+- how deterministic evaluation works
+- how coding evidence reaches the adaptive engine
+- how coding affects follow-up questions
+- tests added
+- focused test results
+- typecheck
+- lint
+- build
+- git status
+- commit hash
+- push status
+
+Do not claim success for anything you did not actually verify.
