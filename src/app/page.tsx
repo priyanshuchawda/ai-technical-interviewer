@@ -8,6 +8,7 @@ import {
   ResponseOutcome,
 } from "@/types/interview";
 import { generateCandidateProfile } from "@/lib/candidateProfiler";
+import { evaluateCodeSubmission, getCodingTask, CodeEvaluation } from "@/lib/codingTasks";
 import candidatesData from "../../candidates.json";
 
 const candidatesList: CandidateProfile[] = (
@@ -15,6 +16,14 @@ const candidatesList: CandidateProfile[] = (
 ).candidates;
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
+
+function getTopicCodingTask(topic: string): ReturnType<typeof getCodingTask> | null {
+  const normalized = topic.toLowerCase();
+  if (normalized.includes("observ") || normalized.includes("logging") || normalized.includes("rag") || normalized.includes("retriev") || normalized.includes("embedding") || normalized.includes("vector")) {
+    return getCodingTask(topic);
+  }
+  return null;
+}
 
 function obTagClass(o: ResponseOutcome | undefined) {
   if (!o) return "ob-tag unknown";
@@ -78,6 +87,22 @@ function parseWhy(raw: string): Array<{ key: string; val: string }> {
   return parts;
 }
 
+type Theme = "light" | "dark";
+type VoiceState = "idle" | "recording" | "processing" | "transcribed" | "error" | "unsupported";
+interface SpeechRecognitionResultLike { isFinal: boolean; 0: { transcript: string }; }
+interface SpeechRecognitionEventLike { resultIndex: number; results: ArrayLike<SpeechRecognitionResultLike>; }
+interface SpeechRecognitionLike {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function InterviewPage() {
@@ -87,21 +112,23 @@ export default function InterviewPage() {
   const [inputMessage, setInputMessage] = useState("");
   const [isStarted, setIsStarted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [assessmentPhase, setAssessmentPhase] = useState<"idle" | "evaluating" | "assessed">("idle");
   const [isDone, setIsDone] = useState(false);
   const [feedback, setFeedback] = useState<InterviewFeedback | null>(null);
   const [intelligence, setIntelligence] = useState<InterviewIntelligenceState | null>(null);
-  const [requestError, setRequestError] = useState("");
 
   // Drawer state for progressive disclosure
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [theme, setTheme] = useState<Theme>("light");
+  const [voiceState, setVoiceState] = useState<VoiceState>("idle");
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [codingMode, setCodingMode] = useState(false);
+  const [codeValue, setCodeValue] = useState("");
+  const [codeEvaluation, setCodeEvaluation] = useState<CodeEvaluation | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const transcriptRef = useRef("");
 
   const composerRef = useRef<HTMLTextAreaElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
-  const csrfReady = useRef<Promise<void> | null>(null);
-
-  useEffect(() => {
-    csrfReady.current = fetch("/api/csrf", { credentials: "same-origin" }).then(() => undefined);
-  }, []);
 
   // Keyboard listener: Cmd/Ctrl+Enter, Esc
   useEffect(() => {
@@ -118,70 +145,121 @@ export default function InterviewPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isDrawerOpen]);
 
+  useEffect(() => {
+    const storedTheme = window.localStorage.getItem("interview-theme") as Theme | null;
+    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    setTheme(storedTheme || systemTheme);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem("interview-theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
+    if (voiceState !== "recording") return;
+    const timer = window.setInterval(() => setRecordingSeconds((seconds) => seconds + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [voiceState]);
   const startInterview = async () => {
     setIsLoading(true);
-    setRequestError("");
-    abortRef.current?.abort();
-    const sid = crypto.randomUUID();
+    const sid = `session-${Date.now()}`;
     setSessionId(sid);
-    abortRef.current = new AbortController();
     try {
-      await csrfReady.current;
       const res = await fetch("/api/interview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
         body: JSON.stringify({ sessionId: sid, candidate: selectedCandidate }),
-        signal: abortRef.current.signal,
       });
       const data = await res.json();
       if (res.ok && data.reply) {
         setMessages([{ role: "interviewer", content: data.reply }]);
         if (data.intelligence) setIntelligence(data.intelligence);
         setIsStarted(true);
-      } else {
-        setRequestError(data.error || `Request failed (${res.status})`);
       }
     } catch (err) {
       console.error(err);
-      setRequestError("Could not start the interview. Retry in a moment.");
     } finally {
       setIsLoading(false);
     }
   };
 
+  const toggleVoiceInput = () => {
+    if (voiceState === "recording") {
+      setVoiceState("processing");
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    const speechWindow = window as Window & {
+      SpeechRecognition?: SpeechRecognitionConstructor;
+      webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    };
+    const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+    if (!Recognition) {
+      setVoiceState("unsupported");
+      return;
+    }
+
+    transcriptRef.current = inputMessage;
+    setRecordingSeconds(0);
+    const recognition = new Recognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+    recognition.onstart = () => setVoiceState("recording");
+    recognition.onresult = (event) => {
+      let transcript = transcriptRef.current;
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        transcript += event.results[index][0].transcript;
+      }
+      transcriptRef.current = transcript;
+      setInputMessage(transcript);
+    };
+    recognition.onerror = () => setVoiceState("error");
+    recognition.onend = () => setVoiceState(transcriptRef.current.trim() ? "transcribed" : "idle");
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  const runCodingTests = () => {
+    if (!codingTask) return;
+    setCodeEvaluation(evaluateCodeSubmission(codingTask, codeValue));
+  };
+
+  const saveCodingEvidence = () => {
+    if (!codingTask) return;
+    const evaluation = codeEvaluation || evaluateCodeSubmission(codingTask, codeValue);
+    setCodeEvaluation(evaluation);
+    setInputMessage("I also completed the optional coding check for " + codingTask.title + ": " + evaluation.passed + " of " + evaluation.total + " checks passed.");
+    setCodingMode(false);
+  };
   const sendTurn = async () => {
     if (!inputMessage.trim() || isLoading || isDone) return;
     const text = inputMessage;
-    setRequestError("");
     setInputMessage("");
     setMessages((p) => [...p, { role: "candidate", content: text }]);
     setIsLoading(true);
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
+    setAssessmentPhase("evaluating");
     try {
-      await csrfReady.current;
       const res = await fetch("/api/interview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
         body: JSON.stringify({ sessionId, message: text }),
-        signal: abortRef.current.signal,
       });
       const data = await res.json();
       if (res.ok) {
         setMessages((p) => [...p, { role: "interviewer", content: data.reply }]);
         if (data.intelligence) setIntelligence(data.intelligence);
+        setAssessmentPhase("assessed");
+        window.setTimeout(() => setAssessmentPhase("idle"), 2200);
         if (data.done) {
           setIsDone(true);
           if (data.feedback) setFeedback(data.feedback);
         }
-      } else {
-        setRequestError(data.error || `Request failed (${res.status})`);
       }
     } catch (err) {
       console.error(err);
-      setRequestError("Could not send the answer. Retry in a moment.");
     } finally {
       setIsLoading(false);
     }
@@ -218,13 +296,10 @@ export default function InterviewPage() {
     return "";
   }, [messages]);
 
-  // History before the latest interviewer message
-  const previousTurns = useMemo(() => {
-    if (messages.length <= 1) return [];
-    return messages.slice(0, messages.length - 1);
-  }, [messages]);
-
   const latestEval = intelligence?.latestEvaluation;
+  const codingTask = useMemo(() => getTopicCodingTask(intelligence?.currentTopic || ""), [intelligence?.currentTopic]);
+  const themeLabel = theme === "light" ? "Dark mode" : "Light mode";
+  const voiceLabel = voiceState === "recording" ? "Listening…" : voiceState === "processing" ? "Transcribing…" : voiceState === "transcribed" ? "Transcribed" : voiceState === "error" ? "Try again" : voiceState === "unsupported" ? "Voice unavailable" : "Speak";
 
   return (
     <>
@@ -240,6 +315,10 @@ export default function InterviewPage() {
             )}
           </div>
 
+          <nav className="studio-nav" aria-label="Interview sections">
+            <button className="studio-nav-item active" type="button">Interview</button>
+            
+          </nav>
           <div className="hdr-right">
             {isStarted && !isDone && (
               <div className="hdr-progress">
@@ -251,7 +330,7 @@ export default function InterviewPage() {
               <span className="live-text">{liveText}</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <label className="csel-label" htmlFor="candidate-selector">Candidate</label>
+              <span className="csel-label">Candidate</span>
               <select
                 id="candidate-selector"
                 className="csel"
@@ -270,6 +349,7 @@ export default function InterviewPage() {
               </select>
             </div>
 
+            <button className="theme-toggle" type="button" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label="Change color theme">{themeLabel}</button>
             {/* Assessment Drawer Trigger Button */}
             <button
               className="btn-drawer-trigger"
@@ -288,16 +368,31 @@ export default function InterviewPage() {
           /* ── STATE A: MINIMAL PRE-INTERVIEW BRIEFING ── */
           <div className="start-container">
             <div className="start-title">Autonomous Interviewer</div>
-            <div>
+            <div className="start-copy">
+              <div className="start-cand-kicker">Candidate profile</div>
               <div className="start-cand-name">{m.name}</div>
               <div className="start-cand-role">{m.jobRole}</div>
+              <div className="start-cand-meta">
+                <span>08 questions</span>
+                <span>Adaptive assessment</span>
+              </div>
             </div>
-            <p className="start-desc">
-              8 questions · Adaptive technical assessment
-            </p>
-            <p className="start-subtext">
-              Questions adapt to your cohort progress and interview performance.
-            </p>
+            <div className="start-details">
+              <p className="start-desc">
+                A focused technical screen that follows your reasoning, tests the edges, and records evidence as you go.
+              </p>
+              <p className="start-subtext">
+                Questions adapt to cohort history and live performance.
+              </p>
+              <div className="start-plan">
+              <div className="start-plan-label">Interview plan</div>
+              {profileFocusAreas.slice(0, 4).map((area, index) => (
+                <div key={area.day} className="start-plan-row">
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <span>{area.title}</span>
+                </div>
+              ))}
+              </div>
             <button
               id="start-interview-btn"
               className="btn-start-main"
@@ -306,7 +401,7 @@ export default function InterviewPage() {
             >
               {isLoading ? "Initializing…" : "Start interview →"}
             </button>
-            {requestError ? <p className="start-subtext">{requestError}</p> : null}
+            </div>
           </div>
         ) : (
           /* ── STATE B: ACTIVE INTERVIEW WORKSPACE ── */
@@ -330,25 +425,17 @@ export default function InterviewPage() {
               </div>
             )}
 
-            {/* Previous Transcript Entries (Editorial Style) */}
-            {previousTurns.length > 0 && (
-              <div className="transcript-list">
-                {previousTurns.map((msg, idx) => {
-                  const isByInterviewer = msg.role === "interviewer";
-                  return (
-                    <div key={idx} className="t-row">
-                      <div className={`t-author${!isByInterviewer ? " cand" : ""}`}>
-                        {isByInterviewer ? "Interviewer" : m.name}
-                      </div>
-                      <div className={`t-content${isByInterviewer ? " interviewer" : ""}`}>
-                        {msg.content}
-                      </div>
-                    </div>
-                  );
-                })}
+            {assessmentPhase !== "idle" && (
+              <div className={"adaptive-status " + assessmentPhase} role="status" aria-live="polite">
+                <span className="adaptive-status-mark">{assessmentPhase === "evaluating" ? "•••" : "✓"}</span>
+                <span className="adaptive-status-copy">
+                  <strong>{assessmentPhase === "evaluating" ? "Evaluating response" : intelligence?.adaptiveDecision?.label || "Response assessed"}</strong>
+                  {assessmentPhase === "assessed" && intelligence?.adaptiveDecision?.detail && (
+                    <span>{intelligence.adaptiveDecision.detail}</span>
+                  )}
+                </span>
               </div>
             )}
-
             {/* Current Prominent Interviewer Question */}
             {latestInterviewerMsg && (
               <div className="question-hero">
@@ -356,8 +443,6 @@ export default function InterviewPage() {
                 <div className="question-text">{latestInterviewerMsg}</div>
               </div>
             )}
-
-            {requestError ? <p className="start-subtext">{requestError}</p> : null}
 
             {isLoading && (
               <div className="loading-indicator">
@@ -370,8 +455,62 @@ export default function InterviewPage() {
               </div>
             )}
 
+            {codingTask && (
+              <div className="coding-launch">
+              <div>
+                <span className="coding-launch-kicker">Implementation check</span>
+                <strong>Test this concept in code</strong>
+                <span>Optional · relevant to this topic</span>
+              </div>
+              <button type="button" className="coding-launch-button" onClick={() => { setCodingMode(true); setCodeEvaluation(null); setCodeValue(codingTask.starterCode); }}>
+                Open coding task
+              </button>
+            </div>
+            )}
+
+            {codingMode && codingTask && (
+              <section className="coding-workspace" aria-label="Coding assessment">
+                <div className="coding-head">
+                  <div>
+                    <span className="coding-kicker">Coding assessment</span>
+                    <h2>{codingTask.title}</h2>
+                    <p>{codingTask.prompt}</p>
+                  </div>
+                  <button type="button" className="coding-close" onClick={() => setCodingMode(false)}>Close</button>
+                </div>
+                <div className="coding-requirements">
+                  {codingTask.requirements.map((requirement) => <span key={requirement}>{requirement}</span>)}
+                </div>
+                <div className="code-editor">
+                  <div className="code-editor-bar">
+                    <span>{codingTask.language}</span>
+                    <span>deterministic runner</span>
+                  </div>
+                  <textarea aria-label="Code editor" value={codeValue} onChange={(event) => setCodeValue(event.target.value)} spellCheck={false} />
+                </div>
+                <div className="coding-actions">
+                  <button type="button" className="coding-run" onClick={runCodingTests}>Run checks</button>
+                  <button type="button" className="coding-submit" onClick={saveCodingEvidence}>Use as interview evidence</button>
+                </div>
+                {codeEvaluation && (
+                  <div className="code-results">
+                    <div className="code-results-summary">
+                      <strong>{codeEvaluation.passed}/{codeEvaluation.total} checks passed</strong>
+                      <span>{codeEvaluation.executionMs}ms · static deterministic analysis</span>
+                    </div>
+                    {codeEvaluation.tests.map((test) => (
+                      <div key={test.name} className={"code-test " + (test.passed ? "pass" : "fail")}>
+                        <span>{test.passed ? "✓" : "×"}</span>
+                        <span>{test.name}</span>
+                        <small>{test.detail}</small>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
             {/* Response Composer */}
-            {!isDone && (
+            {!isDone && !codingMode && (
               <div className="composer-box">
                 <div className="composer-label">Your Response</div>
                 <textarea
@@ -386,28 +525,15 @@ export default function InterviewPage() {
                   rows={4}
                 />
                 <div className="composer-footer">
-                  <span className="kbd-hint">⌘/Ctrl Enter to submit</span>
-                  {isLoading ? (
-                    <button
-                      id="cancel-response-btn"
-                      className="btn-submit"
-                      onClick={() => {
-                        abortRef.current?.abort();
-                        setIsLoading(false);
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  ) : (
-                    <button
-                      id="submit-response-btn"
-                      className="btn-submit"
-                      onClick={sendTurn}
-                      disabled={!inputMessage.trim()}
-                    >
-                      Submit →
-                    </button>
-                  )}
+                  <span className="kbd-hint">⌘ Enter to submit</span>
+                  <button
+                    id="submit-response-btn"
+                    className="btn-submit"
+                    onClick={sendTurn}
+                    disabled={isLoading || !inputMessage.trim()}
+                  >
+                    {isLoading ? "Evaluating…" : "Submit →"}
+                  </button>
                 </div>
               </div>
             )}

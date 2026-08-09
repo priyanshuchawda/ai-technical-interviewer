@@ -113,6 +113,7 @@ export interface InterviewIntelligenceState {
   }>;
   latestEvaluation?: AnswerEvaluation;
   whyThisQuestion: string;
+  adaptiveDecision?: { label: string; detail: string };
 }
 
 export interface InterviewStartRequest {
@@ -162,4 +163,5 @@ export interface InterviewSessionState {
   intelligenceProfile?: CandidateIntelligenceProfile;
   masteryState: Map<number, TopicMastery>;
   latestEvaluation?: AnswerEvaluation;
+  adaptiveDecision?: { label: string; detail: string };
 }
