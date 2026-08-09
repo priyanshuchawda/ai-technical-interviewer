@@ -444,3 +444,51 @@ Requirements:
 
 13. Do not change POST /api/interview or the sessionId contract.
 ```
+
+## Enterprise UI Redesign Implementation Prompt
+```
+Redesign the ENTIRE frontend UI of the Autonomous AI Interview Agent into a polished, modern enterprise technical-assessment product.
+
+IMPORTANT: This is a UI/UX redesign only. The existing backend intelligence and interview behavior are valuable and MUST be preserved.
+
+The current interface feels like generic AI-dashboard design because of excessive gradients, purple/blue glow, glassmorphism, dense bordered cards, small typography, and too much visual decoration.
+
+The new design should feel like: Linear, Vercel, Stripe, Karat / professional technical interview software. Use a LIGHT interface.
+
+Color system:
+- Page background: very light neutral gray/off-white (#f5f5f5)
+- Main surfaces: white
+- Primary text: dark charcoal / near-black (#111827)
+- Secondary text: muted gray (#374151)
+- Borders: subtle neutral gray (#e5e7eb)
+- Primary accent: restrained blue (#2563eb)
+- Success: green (#16a34a)
+- Warning/off-topic: amber (#d97706)
+- Error: red (#dc2626)
+
+Avoid: purple gradients, cyan/purple glow, neon effects, gradient backgrounds, glowing borders, glassmorphism, decorative blobs, excessive pills, excessive rounded cards, unnecessary animations.
+
+Typography: Inter. Body ~14px. Metadata ~12px. Question text ~19-22px. Hierarchy through weight and spacing, not color and borders.
+
+OVERALL INFORMATION ARCHITECTURE:
+1. Interview / current question (most prominent)
+2. Candidate identity and interview progress
+3. Answer input
+4. Interview Intelligence
+5. Supporting metadata
+
+Desktop three-column layout: LEFT candidate context, CENTER interview + answer, RIGHT intelligence panel.
+
+The intelligence panel must expose: current curriculum day/topic, difficulty/adaptive state, candidate focus areas, live mastery bars, latest evaluation (outcome, score, demonstrated/missing concepts), why-this-question explanation.
+
+Evaluation states: strong (green), partial (blue), weak (red), unknown (neutral), off_topic (amber).
+
+IMPORTANT FUNCTIONALITY TO PRESERVE:
+POST /api/interview, sessionId, candidate selection, multi-turn conversation, adaptive questioning, Breeth Graph Memory, answer evaluation, off-topic detection, mastery state, canonical curriculum mappings, evidence-backed feedback, loading/error handling.
+
+Do not add new AI features, databases, APIs, or libraries.
+
+TESTING: run npm test and npm run build.
+
+GIT: git commit -m "feat: redesign interviewer interface" and push to https://github.com/priyanshuchawda/autonomous-ai-interviewer
+```
