@@ -1,5 +1,6 @@
 import { InterviewFeedback, InterviewSessionState, TopicMastery } from "../types/interview";
 import { getCurriculumDay } from "./dataService";
+import { displayFirstName } from "./pii";
 
 /**
  * Deterministically generates evidence-backed feedback strictly from live interview evaluation state.
@@ -55,7 +56,7 @@ export function generateEvidenceBackedFeedback(session: InterviewSessionState): 
   }
 
   // 4. SUMMARY (Concise assessment of demonstrated performance)
-  const summary = `${candidate.member.name} completed a multi-turn technical evaluation covering ${session.evaluatedDays.size} curriculum days. Demonstrated technical proficiency across ${strongTopics.length} topic(s) and identified ${weakTopics.length} area(s) needing further depth.`;
+  const summary = `${displayFirstName(candidate)} completed a multi-turn technical evaluation covering ${session.evaluatedDays.size} curriculum days. Demonstrated technical proficiency across ${strongTopics.length} topic(s) and identified ${weakTopics.length} area(s) needing further depth.`;
 
   return {
     summary,

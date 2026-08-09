@@ -17,6 +17,20 @@ export function evaluateAnswer(
   const tools = curriculumDay?.tools ?? [];
 
   const allConcepts = [...objectives, ...topics, ...tools];
+  const genericWords = new Set([
+    "using", "implemented", "implementation", "pipeline", "designed", "system",
+    "application", "optimized", "scalable", "created", "build", "built", "through",
+  ]);
+
+  if (lowerAnswer.length < 12 && outcome !== "unknown" && outcome !== "off_topic") {
+    return {
+      outcome: "weak",
+      score: 0.1,
+      demonstratedConcepts: [],
+      missingConcepts: allConcepts.filter((c) => c.length < 80),
+      evidence: "Answer was too short to demonstrate topic mastery.",
+    };
+  }
 
   // If off_topic: 0 score, 0 demonstrated concepts for current topic
   if (outcome === "off_topic") {
@@ -36,7 +50,7 @@ export function evaluateAnswer(
   const missingConcepts: string[] = [];
 
   for (const concept of allConcepts) {
-    const keywords = concept.toLowerCase().split(/[\s,&]+/).filter((w) => w.length > 4);
+    const keywords = concept.toLowerCase().split(/[\s,&]+/).filter((w) => w.length > 4 && !genericWords.has(w));
     const mentioned = keywords.some((kw) => lowerAnswer.includes(kw));
     if (mentioned) {
       demonstratedConcepts.push(concept);
@@ -57,6 +71,10 @@ export function evaluateAnswer(
   const conceptCoverage = allConcepts.length > 0
     ? demonstratedConcepts.length / allConcepts.length
     : 0;
+
+  if (outcome === "strong" && lowerAnswer.length < 40) {
+    baseScore = 0.5;
+  }
 
   // Weighted: 70% outcome, 30% concept coverage
   const score = Math.min(1, parseFloat((baseScore * 0.7 + conceptCoverage * 0.3).toFixed(2)));
