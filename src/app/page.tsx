@@ -38,9 +38,9 @@ function obLabel(o: ResponseOutcome | undefined) {
 }
 
 function mbFillColor(s: number): string {
-  if (s >= 0.65) return "var(--green)";
-  if (s >= 0.4) return "var(--blue)";
-  return "var(--red)";
+  if (s >= 0.65) return "var(--mint)";
+  if (s >= 0.4) return "var(--accent)";
+  return "var(--rose)";
 }
 
 /**
@@ -711,8 +711,8 @@ export default function InterviewPage() {
                 {/* Current Topic */}
                 <div className="drawer-sec">
                   <span className="drawer-eyebrow">Topic</span>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ink-1)" }}>
-                    Day {intelligence.currentTopic}
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>
+                    {intelligence.currentTopic}
                   </div>
                 </div>
 
@@ -781,7 +781,7 @@ export default function InterviewPage() {
                   <div className="why-box">
                     {parseWhy(intelligence.whyThisQuestion).map((r, i) => (
                       <div key={i} style={{ marginBottom: 4 }}>
-                        <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", color: "var(--ink-3)", display: "block" }}>{r.key}</span>
+                        <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", color: "var(--text-3)", display: "block" }}>{r.key}</span>
                         <span>{r.val}</span>
                       </div>
                     ))}
@@ -791,8 +791,8 @@ export default function InterviewPage() {
                 {/* Breeth Memory */}
                 <div className="drawer-sec">
                   <span className="drawer-eyebrow">Memory</span>
-                  <div style={{ fontSize: 12, color: "var(--ink-2)", display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--blue)" }} />
+                  <div style={{ fontSize: 12, color: "var(--text-2)", display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)" }} />
                     <span>
                       {intelligence.masteryScores.length > 0
                         ? `${intelligence.masteryScores.length} topic${intelligence.masteryScores.length !== 1 ? "s" : ""} in session memory`
@@ -823,7 +823,7 @@ export default function InterviewPage() {
                       <span className="plan-num-drawer">{String(i + 1).padStart(2, "0")}</span>
                       <div>
                         <div style={{ fontWeight: 600 }}>{fa.title}</div>
-                        <div style={{ fontSize: 10, color: "var(--ink-3)" }}>{fa.reason}</div>
+                        <div style={{ fontSize: 10, color: "var(--text-3)" }}>{fa.reason}</div>
                       </div>
                     </div>
                   ))}
