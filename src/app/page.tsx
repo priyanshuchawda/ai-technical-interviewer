@@ -547,7 +547,7 @@ export default function InterviewPage() {
                   rows={4}
                 />
                 <div className="composer-footer">
-                  <span className="kbd-hint">⌘ Enter to submit</span>
+                  <span className="kbd-hint">⌘/Ctrl Enter to submit</span>
                   {isLoading ? (
                     <button id="cancel-response-btn" className="btn-submit cancel" onClick={cancelRequest}>
                       Cancel
