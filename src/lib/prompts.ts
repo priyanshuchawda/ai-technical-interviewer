@@ -1,4 +1,4 @@
-import { CandidateProfile, CandidateIntelligenceProfile, CurriculumDay, ResponseOutcome } from "../types/interview";
+import { CandidateProfile, CandidateIntelligenceProfile, CurriculumDay, ResponseOutcome, TopicMastery } from "../types/interview";
 
 /**
  * System prompt template for conducting dynamic multi-turn technical interviews.
@@ -10,7 +10,8 @@ export function buildInterviewerSystemPrompt(
   intelligenceProfile?: CandidateIntelligenceProfile,
   lastOutcome?: ResponseOutcome,
   turnsOnCurrentDay?: number,
-  retrievedMemories?: string[]
+  retrievedMemories?: string[],
+  masteryContext?: TopicMastery
 ): string {
   let profileContext = "";
   if (intelligenceProfile) {
@@ -42,6 +43,20 @@ ${retrievedMemories.map((m, i) => `Memory ${i + 1}: ${m}`).join("\n")}
 `;
   }
 
+  let masteryStateContext = "";
+  if (masteryContext) {
+    masteryStateContext = `
+=== CURRENT INTERVIEW MASTERY STATE (Day ${masteryContext.day}) ===
+Attempts: ${masteryContext.attempts}
+Running Score: ${masteryContext.score.toFixed(2)}
+Demonstrated Concepts: ${masteryContext.demonstratedConcepts.join(", ")}
+Missing Concepts: ${masteryContext.missingConcepts.join(", ")}
+Last Outcome: ${masteryContext.lastOutcome}
+(Use this to ask targeted follow-up questions targeting the missing concepts above)
+`;
+  }
+
+
   let adaptiveGuidance = "";
   if (lastOutcome === "unknown") {
     adaptiveGuidance = `
@@ -71,7 +86,7 @@ Education: ${candidate.member.education}
 
 Missions Completed: ${candidate.signals.missionsCompleted}
 Commit Days: ${candidate.signals.commitDays}${profileContext}
-${groundingContext}${memoryContext}${adaptiveGuidance}
+${groundingContext}${memoryContext}${masteryStateContext}${adaptiveGuidance}
 
 Instructions:
 - Be concise, professional, engaging, and technically rigorous.

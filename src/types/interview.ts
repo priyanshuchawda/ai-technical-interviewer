@@ -102,6 +102,24 @@ export interface InterviewEndResponse {
 
 export type InterviewResponse = InterviewStartResponse | InterviewTurnResponse | InterviewEndResponse;
 
+export interface AnswerEvaluation {
+  outcome: ResponseOutcome;
+  score: number; // 0 to 1
+  demonstratedConcepts: string[];
+  missingConcepts: string[];
+  evidence: string;
+}
+
+export interface TopicMastery {
+  day: number;
+  topic: string;
+  score: number; // running average
+  attempts: number;
+  demonstratedConcepts: string[];
+  missingConcepts: string[];
+  lastOutcome: ResponseOutcome;
+}
+
 export interface InterviewSessionState {
   sessionId: string;
   candidate: CandidateProfile;
@@ -114,4 +132,5 @@ export interface InterviewSessionState {
   done: boolean;
   feedback?: InterviewFeedback;
   intelligenceProfile?: CandidateIntelligenceProfile;
+  masteryState: Map<number, TopicMastery>;
 }
