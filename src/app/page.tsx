@@ -170,12 +170,18 @@ export default function InterviewDashboard() {
                     <strong>Latest Evaluation:</strong>
                     <span style={{
                       color: intelligence.latestEvaluation.outcome === "strong" ? "var(--accent-emerald)" :
+                             intelligence.latestEvaluation.outcome === "off_topic" ? "#f59e0b" :
                              intelligence.latestEvaluation.outcome === "weak" || intelligence.latestEvaluation.outcome === "unknown" ? "#f87171" : "var(--accent-cyan)",
                       fontWeight: "700", textTransform: "uppercase", fontSize: "0.75rem"
                     }}>
-                      {intelligence.latestEvaluation.outcome} ({Math.round(intelligence.latestEvaluation.score * 100)}%)
+                      {intelligence.latestEvaluation.outcome === "off_topic" ? "OFF TOPIC" : intelligence.latestEvaluation.outcome} ({Math.round(intelligence.latestEvaluation.score * 100)}%)
                     </span>
                   </div>
+                  {intelligence.latestEvaluation.evidence && (
+                    <div style={{ color: intelligence.latestEvaluation.outcome === "off_topic" ? "#f59e0b" : "var(--text-muted)", fontSize: "0.75rem", marginBottom: "4px" }}>
+                      {intelligence.latestEvaluation.evidence}
+                    </div>
+                  )}
                   {intelligence.latestEvaluation.demonstratedConcepts.length > 0 && (
                     <div style={{ color: "var(--accent-emerald)", fontSize: "0.75rem", marginBottom: "4px" }}>
                       ✓ Demonstrated: {intelligence.latestEvaluation.demonstratedConcepts.join(", ")}

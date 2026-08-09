@@ -10,7 +10,7 @@ export function evaluateAnswer(
   curriculumDay: CurriculumDay | undefined,
   previousOutcome?: ResponseOutcome
 ): AnswerEvaluation {
-  const outcome = classifyResponseOutcome(answer);
+  const outcome = classifyResponseOutcome(answer, curriculumDay);
   const lowerAnswer = answer.toLowerCase().trim();
 
   const objectives = curriculumDay?.objectives ?? [];
@@ -18,6 +18,19 @@ export function evaluateAnswer(
   const tools = curriculumDay?.tools ?? [];
 
   const allConcepts = [...objectives, ...topics, ...tools];
+
+  // If off_topic: 0 score, 0 demonstrated concepts for current topic
+  if (outcome === "off_topic") {
+    const missingConcepts = allConcepts.filter((c) => c.length < 80);
+    const evidence = `Response discussed an unrelated topic, but the current question tested Day ${curriculumDay?.day || ""}: ${curriculumDay?.title || "current topic"}.`;
+    return {
+      outcome,
+      score: 0.0,
+      demonstratedConcepts: [],
+      missingConcepts,
+      evidence,
+    };
+  }
 
   // Map curriculum concepts to keywords that would appear in a candidate answer
   const demonstratedConcepts: string[] = [];
