@@ -1,4 +1,4 @@
-import { CandidateProfile, CandidateIntelligenceProfile } from "../types/interview";
+import { CandidateProfile, CandidateIntelligenceProfile, CurriculumDay, ResponseOutcome } from "../types/interview";
 
 /**
  * System prompt template for conducting dynamic multi-turn technical interviews.
@@ -6,8 +6,10 @@ import { CandidateProfile, CandidateIntelligenceProfile } from "../types/intervi
 export function buildInterviewerSystemPrompt(
   candidate: CandidateProfile,
   targetMission: any,
-  curriculumDay: any,
-  intelligenceProfile?: CandidateIntelligenceProfile
+  curriculumDay: CurriculumDay | undefined,
+  intelligenceProfile?: CandidateIntelligenceProfile,
+  lastOutcome?: ResponseOutcome,
+  turnsOnCurrentDay?: number
 ): string {
   let profileContext = "";
   if (intelligenceProfile) {
@@ -20,6 +22,38 @@ Recommended Focus Areas: ${intelligenceProfile.recommendedFocusAreas.map((f) => 
 `;
   }
 
+  const groundingContext = `
+=== GROUNDING CURRICULUM CONTEXT ===
+Day ${targetMission.day}: ${targetMission.title}
+Module Type: ${curriculumDay?.type || "Technical Implementation"}
+Curriculum Objectives:
+${curriculumDay?.objectives?.map((o) => `- ${o}`).join("\n") || "- Core technical implementation and architectural trade-offs"}
+Covered Topics: ${curriculumDay?.topics?.join(", ") || "General AI engineering"}
+Key Tools: ${curriculumDay?.tools?.join(", ") || "Standard tech stack"}
+`;
+
+  let adaptiveGuidance = "";
+  if (lastOutcome === "unknown") {
+    adaptiveGuidance = `
+ADAPTIVE GUIDANCE [UNKNOWN ANSWER DETECTED]:
+The candidate previously responded with "I don't know" or an equivalent unknown response.
+- DO NOT immediately jump to an unrelated topic or new day.
+- Stay on Day ${targetMission.day} ("${targetMission.title}").
+- Ask a simpler, foundational prerequisite question directly grounded in the curriculum objective: "${curriculumDay?.objectives?.[0] || targetMission.title}".
+- Test if the candidate can recover their grounding with a simpler concept framing.`;
+  } else if (lastOutcome === "weak") {
+    adaptiveGuidance = `
+ADAPTIVE GUIDANCE [WEAK ANSWER DETECTED]:
+The candidate provided a brief or uncertain answer.
+- Stay grounded on Day ${targetMission.day} ("${targetMission.title}").
+- Ask a simpler prerequisite question or clarify fundamental concepts before advancing.`;
+  } else if (lastOutcome === "strong") {
+    adaptiveGuidance = `
+ADAPTIVE GUIDANCE [STRONG ANSWER DETECTED]:
+The candidate gave a strong technical response.
+- Probe deeper into architectural trade-offs, production scalability, or advance to the next curriculum objective.`;
+  }
+
   return `You are an elite AI Technical Interviewer conducting a multi-turn evaluation for a candidate entering an AI engineering role.
 Candidate Name: ${candidate.member.name}
 Role: ${candidate.member.jobRole} (${candidate.member.yearsExperience} years exp)
@@ -27,15 +61,12 @@ Education: ${candidate.member.education}
 
 Missions Completed: ${candidate.signals.missionsCompleted}
 Commit Days: ${candidate.signals.commitDays}${profileContext}
-
-Current Target Mission: Day ${targetMission.day} - "${targetMission.title}"
-Target Curriculum Objectives: ${curriculumDay?.objectives?.join("; ") || "Core technical implementation"}
+${groundingContext}${adaptiveGuidance}
 
 Instructions:
 - Be concise, professional, engaging, and technically rigorous.
-- Use candidate intelligence signals to tailor questions (e.g. ask deeper architectural questions for strong areas or probe root causes for high-attempt/skipped areas).
-- If turn count is 0, warmly welcome the candidate by name and ask a strong technical opening question about their Day ${targetMission.day} mission ("${targetMission.title}").
-- If turn count > 0, evaluate the candidate's last answer, acknowledge technical nuances, and transition naturally into a follow-up question or target question about Day ${targetMission.day} ("${targetMission.title}").
+- Rely STRICTLY on the supplied grounding curriculum context above. Do not invent non-existent curriculum objectives.
+- If turn count is 0, warmly welcome the candidate by name and ask a strong technical opening question about their target focus Day ${targetMission.day} mission ("${targetMission.title}").
 - Keep your response to 2-4 sentences maximum. Do not format as markdown headers or lists. Speak directly as the interviewer.`;
 }
 

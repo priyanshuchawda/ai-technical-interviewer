@@ -45,3 +45,63 @@ GIT:
 - push the commit to:
   https://github.com/priyanshuchawda/autonomous-ai-interviewer
 ```
+
+## Profile-Driven Adaptive Questioning Implementation Prompt
+```
+Now implement the second incremental step: make the interview question selection use the candidate intelligence profile created in the previous commit.
+
+Inspect the current interviewEngine.ts, prompts.ts, candidateProfiler.ts, curriculum data, and existing tests before changing anything.
+
+Requirements:
+
+1. At interview initialization, use the candidate profile to choose an initial focus area instead of selecting a topic generically.
+
+2. Prefer recommendedFocusAreas from the candidate profile, while still respecting the supplied curriculum and the requirement to cover at least 4 curriculum days over the full interview.
+
+3. When generating a question, include the relevant curriculum day/title/objectives as grounding context. Do not invent curriculum objectives.
+
+4. Track the current interview topic/day in the existing session state.
+
+5. After a candidate answer, classify the response into a small structured outcome:
+   - strong
+   - partial
+   - weak
+   - unknown
+
+   Keep this classification simple for now. Do not build the full mastery system yet.
+
+6. For this step, change the behavior when the candidate says "I don't know", "no idea", "nope", or gives an equivalent unknown response:
+   - do NOT immediately jump to an unrelated topic
+   - generate a simpler prerequisite question related to the current topic/day
+   - keep the conversation on the same concept long enough to test whether the candidate can recover
+
+7. For a strong answer, allow the next question to increase difficulty or move to a related objective.
+
+8. For a weak/unknown answer, prefer a prerequisite or simpler question before changing topics.
+
+9. Keep the existing POST /api/interview contract unchanged.
+
+10. Do not add a database or rewrite the UI.
+
+11. Preserve the Breeth integration. Do not remove or bypass it.
+
+12. Add focused tests for:
+   - candidate profile influencing initial topic selection
+   - unknown answer causing a same-topic/prerequisite follow-up
+   - strong answer allowing progression
+   - curriculum grounding being present in generated question context
+   - existing interview/session tests remaining valid
+
+VALIDATION:
+- run npm test
+- run npm run build
+- verify Sarah's interview no longer immediately jumps to an unrelated topic after "dont know"
+- verify a strong answer can progress the interview
+- verify the existing API still works
+
+GIT:
+- commit the changes with:
+  feat: add profile-driven adaptive questioning
+- push to:
+  https://github.com/priyanshuchawda/autonomous-ai-interviewer
+```
