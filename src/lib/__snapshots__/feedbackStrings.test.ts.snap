@@ -1,0 +1,16 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`feedback string contracts > formats strengths, gaps, and next steps with canonical day titles 1`] = `
+{
+  "gaps": [
+    "Day 12 (Prompt Engineering Fundamentals): Struggled with key concepts (few-shot, chain of thought) during live evaluation.",
+  ],
+  "next": [
+    "Review Day 12 (Prompt Engineering Fundamentals) curriculum module focusing on Understand zero-shot, few-shot, and chain-of-thought prompting.",
+  ],
+  "strengths": [
+    "Day 29 (Monitoring, Logging & Observability): Demonstrated clear understanding of structured logging, token latency.",
+  ],
+  "summary": "Sarah completed a multi-turn technical evaluation covering 2 curriculum days. Demonstrated technical proficiency across 1 topic(s) and identified 1 area(s) needing further depth.",
+}
+`;
