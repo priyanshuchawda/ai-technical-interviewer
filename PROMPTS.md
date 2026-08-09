@@ -563,3 +563,35 @@ Breeth, mastery, curriculum mapping, final feedback, off-topic handling.
 
 GIT: git commit -m "fix: restore personalized assessment focus UI"
 ```
+
+## Product Copy & Motion System Polish Implementation Prompt
+```
+Perform a final product-polish pass on the CURRENT Autonomous AI Interviewer frontend.
+
+This task has TWO goals:
+1. Make all visible product copy feel natural, human, and professional rather than AI-generated.
+2. Add a restrained, smooth motion system that makes the interface feel premium and responsive.
+
+DO NOT redesign the current visual system.
+
+COPY/UX LANGUAGE CHANGES:
+- Header: Subtitle -> "Technical assessment", status -> "Ready to start" / "Live interview".
+- Candidate panel: `${yearsExperience} years experience · ${education}`, `${missionsCompleted} missions · ${missionsFirstTry} first-attempt passes · ${commitDays} active days`.
+- Assessment Plan eyebrow: "INTERVIEW PLAN".
+- Pre-interview briefing: "8 questions based on your cohort progress and interview performance. Questions will adjust as you answer.", button -> "Start interview →".
+- Pre-interview right panel: "INTERVIEW PLAN", "Based on [Candidate]'s cohort progress", "WHAT TO EXPECT" (8 questions, Questions adjust based on your answers, Your progress is tracked throughout the interview, Previous answers can influence later questions).
+- During interview right panel: "LIVE ASSESSMENT", "LATEST ANSWER", "STILL TO COVER", "WHY THIS QUESTION" (Profile, Goal, Next), "MEMORY" (Breeth Graph Memory).
+
+MOTION SYSTEM:
+- Entrance animation for workspace (`workspace-entrance` keyframes, 380ms ease-out).
+- Smooth cross-fade transition on candidate switch.
+- Transcript message entrance (`msg-fade-in` keyframes, 280ms).
+- Evaluation block pop/fade (`eval-pop` keyframes, 250ms).
+- Smooth interpolation on mastery bar fills and numeric values.
+- Hover & active press states for buttons (`btn-start-main`, `btn-submit`).
+- `@media (prefers-reduced-motion: reduce)` support for accessibility.
+
+PRESERVE: All backend behavior, API contracts, candidateProfiler, Breeth integration, mastery logic, canonical curriculum mappings.
+
+GIT: git commit -m "feat: polish interview UI copy and motion"
+```
