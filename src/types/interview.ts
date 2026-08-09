@@ -72,36 +72,6 @@ export interface InterviewFeedback {
   next: string[];
 }
 
-export interface InterviewStartRequest {
-  sessionId: string;
-  candidate: CandidateProfile;
-}
-
-export interface InterviewTurnRequest {
-  sessionId: string;
-  message: string;
-}
-
-export type InterviewRequest = InterviewStartRequest | InterviewTurnRequest;
-
-export interface InterviewStartResponse {
-  reply: string;
-  done: false;
-}
-
-export interface InterviewTurnResponse {
-  reply: string;
-  done: false;
-}
-
-export interface InterviewEndResponse {
-  reply: string;
-  done: true;
-  feedback: InterviewFeedback;
-}
-
-export type InterviewResponse = InterviewStartResponse | InterviewTurnResponse | InterviewEndResponse;
-
 export interface AnswerEvaluation {
   outcome: ResponseOutcome;
   score: number; // 0 to 1
@@ -120,6 +90,64 @@ export interface TopicMastery {
   lastOutcome: ResponseOutcome;
 }
 
+export interface InterviewIntelligenceState {
+  currentDay: number;
+  currentTopic: string;
+  progress: {
+    turnCount: number;
+    totalTurns: number;
+    evaluatedDaysCount: number;
+  };
+  difficultyState: string;
+  focusAreas: Array<{
+    day: number;
+    title: string;
+    reason: string;
+  }>;
+  masteryScores: Array<{
+    day: number;
+    topic: string;
+    score: number;
+    attempts: number;
+    lastOutcome: ResponseOutcome;
+  }>;
+  latestEvaluation?: AnswerEvaluation;
+  whyThisQuestion: string;
+}
+
+export interface InterviewStartRequest {
+  sessionId: string;
+  candidate: CandidateProfile;
+}
+
+export interface InterviewTurnRequest {
+  sessionId: string;
+  message: string;
+}
+
+export type InterviewRequest = InterviewStartRequest | InterviewTurnRequest;
+
+export interface InterviewStartResponse {
+  reply: string;
+  done: false;
+  intelligence?: InterviewIntelligenceState;
+}
+
+export interface InterviewTurnResponse {
+  reply: string;
+  done: false;
+  intelligence?: InterviewIntelligenceState;
+}
+
+export interface InterviewEndResponse {
+  reply: string;
+  done: true;
+  feedback: InterviewFeedback;
+  intelligence?: InterviewIntelligenceState;
+}
+
+export type InterviewResponse = InterviewStartResponse | InterviewTurnResponse | InterviewEndResponse;
+
 export interface InterviewSessionState {
   sessionId: string;
   candidate: CandidateProfile;
@@ -133,4 +161,5 @@ export interface InterviewSessionState {
   feedback?: InterviewFeedback;
   intelligenceProfile?: CandidateIntelligenceProfile;
   masteryState: Map<number, TopicMastery>;
+  latestEvaluation?: AnswerEvaluation;
 }

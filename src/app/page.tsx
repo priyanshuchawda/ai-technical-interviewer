@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { CandidateProfile, InterviewFeedback } from "@/types/interview";
+import { CandidateProfile, InterviewFeedback, InterviewIntelligenceState } from "@/types/interview";
 import candidatesData from "../../candidates.json";
 
 const candidatesList: CandidateProfile[] = (candidatesData as { candidates: CandidateProfile[] }).candidates;
@@ -15,6 +15,7 @@ export default function InterviewDashboard() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isDone, setIsDone] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<InterviewFeedback | null>(null);
+  const [intelligence, setIntelligence] = useState<InterviewIntelligenceState | null>(null);
 
   const startInterview = async () => {
     setIsLoading(true);
@@ -34,6 +35,9 @@ export default function InterviewDashboard() {
       const data = await res.json();
       if (res.ok && data.reply) {
         setMessages([{ role: "interviewer", content: data.reply }]);
+        if (data.intelligence) {
+          setIntelligence(data.intelligence);
+        }
         setIsStarted(true);
       }
     } catch (err) {
@@ -64,6 +68,9 @@ export default function InterviewDashboard() {
       const data = await res.json();
       if (res.ok) {
         setMessages((prev) => [...prev, { role: "interviewer", content: data.reply }]);
+        if (data.intelligence) {
+          setIntelligence(data.intelligence);
+        }
         if (data.done) {
           setIsDone(true);
           if (data.feedback) setFeedback(data.feedback);
@@ -96,8 +103,8 @@ export default function InterviewDashboard() {
         </div>
       </header>
 
-      <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: "24px" }}>
-        {/* Left Sidebar: Candidate Profile */}
+      <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: "24px" }}>
+        {/* Left Sidebar: Candidate Profile & Intelligence Panel */}
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           <div className="glass-panel" style={{ padding: "20px" }}>
             <h2 style={{ fontSize: "1.1rem", marginBottom: "16px", color: "var(--accent-cyan)" }}>Select Candidate</h2>
@@ -129,6 +136,77 @@ export default function InterviewDashboard() {
               <div><strong>Commit Days:</strong> {selectedCandidate.signals.commitDays}</div>
             </div>
           </div>
+
+          {/* Interview Intelligence Live Panel */}
+          {isStarted && intelligence && (
+            <div className="glass-panel" style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "14px", fontSize: "0.85rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h2 style={{ fontSize: "1rem", color: "var(--accent-cyan)", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span>🧠</span> Interview Intelligence
+                </h2>
+                <span style={{ padding: "2px 8px", borderRadius: "12px", background: "rgba(99, 102, 241, 0.2)", color: "var(--accent-cyan)", fontSize: "0.75rem", fontWeight: "600" }}>
+                  {intelligence.difficultyState}
+                </span>
+              </div>
+
+              {/* Current Focus & Progress */}
+              <div style={{ background: "rgba(30, 41, 59, 0.5)", padding: "10px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                <div><strong>Current Focus:</strong> Day {intelligence.currentDay} - {intelligence.currentTopic}</div>
+                <div style={{ marginTop: "4px", color: "var(--text-muted)", fontSize: "0.8rem" }}>
+                  Progress: Turn {intelligence.progress.turnCount}/{intelligence.progress.totalTurns} ({intelligence.progress.evaluatedDaysCount} days evaluated)
+                </div>
+              </div>
+
+              {/* Why this Question? */}
+              <div style={{ background: "rgba(99, 102, 241, 0.1)", padding: "10px", borderRadius: "8px", border: "1px solid var(--accent-indigo)" }}>
+                <strong style={{ color: "var(--accent-indigo)", display: "block", marginBottom: "4px" }}>💡 Why this question?</strong>
+                <p style={{ color: "var(--text-main)", fontSize: "0.8rem", lineHeight: "1.4" }}>{intelligence.whyThisQuestion}</p>
+              </div>
+
+              {/* Latest Answer Evaluation */}
+              {intelligence.latestEvaluation && (
+                <div style={{ background: "rgba(30, 41, 59, 0.5)", padding: "10px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                    <strong>Latest Evaluation:</strong>
+                    <span style={{
+                      color: intelligence.latestEvaluation.outcome === "strong" ? "var(--accent-emerald)" :
+                             intelligence.latestEvaluation.outcome === "weak" || intelligence.latestEvaluation.outcome === "unknown" ? "#f87171" : "var(--accent-cyan)",
+                      fontWeight: "700", textTransform: "uppercase", fontSize: "0.75rem"
+                    }}>
+                      {intelligence.latestEvaluation.outcome} ({Math.round(intelligence.latestEvaluation.score * 100)}%)
+                    </span>
+                  </div>
+                  {intelligence.latestEvaluation.demonstratedConcepts.length > 0 && (
+                    <div style={{ color: "var(--accent-emerald)", fontSize: "0.75rem", marginBottom: "4px" }}>
+                      ✓ Demonstrated: {intelligence.latestEvaluation.demonstratedConcepts.join(", ")}
+                    </div>
+                  )}
+                  {intelligence.latestEvaluation.missingConcepts.length > 0 && (
+                    <div style={{ color: "#f87171", fontSize: "0.75rem" }}>
+                      ✗ Missing: {intelligence.latestEvaluation.missingConcepts.slice(0, 2).join(", ")}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Live Topic Mastery Scores */}
+              {intelligence.masteryScores.length > 0 && (
+                <div>
+                  <strong style={{ color: "var(--accent-purple)", display: "block", marginBottom: "6px" }}>📊 Live Topic Mastery:</strong>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    {intelligence.masteryScores.map((m, idx) => (
+                      <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.8rem", background: "rgba(15, 23, 42, 0.6)", padding: "6px 8px", borderRadius: "6px" }}>
+                        <span>Day {m.day}: {m.topic}</span>
+                        <span style={{ fontWeight: "600", color: m.score >= 0.7 ? "var(--accent-emerald)" : m.score >= 0.4 ? "var(--accent-cyan)" : "#f87171" }}>
+                          {Math.round(m.score * 100)}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {!isStarted && (
             <button className="glow-btn" onClick={startInterview} disabled={isLoading} style={{ width: "100%", padding: "14px" }}>

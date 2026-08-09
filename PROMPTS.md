@@ -210,3 +210,47 @@ Add focused tests for:
 6. existing adaptive questioning tests remaining valid
 7. Breeth failure still leaving evaluation functional
 ```
+
+## Interview Intelligence UI Panel Implementation Prompt
+```
+Implement the next incremental feature: add a compact "Interview Intelligence" panel to the existing interviewer UI.
+
+Do not redesign the existing interview experience. Preserve the current visual style and layout as much as practical.
+
+Expose the structured state that the backend already maintains:
+
+1. Current curriculum day/topic
+2. Current question number / interview progress
+3. Current difficulty or progression state if already available
+4. Candidate focus areas
+5. Live topic mastery scores
+6. Demonstrated concepts from the latest evaluated answer
+7. Missing concepts from the latest evaluated answer
+8. Current response outcome (strong/partial/weak/unknown)
+9. A short "Why this question?" explanation based on structured state
+
+The "Why this question?" explanation must be concise and based on observable structured signals such as:
+- candidate profile focus area
+- current curriculum objective
+- previous answer outcome
+- missing concepts
+- mastery state
+- skipped/high-attempt history
+
+Do NOT expose chain-of-thought or hidden reasoning.
+
+Use labels such as:
+"Profile signal", "Curriculum objective", "Previous answer", and "Current mastery" where useful.
+
+Important:
+- Keep the existing POST /api/interview contract compatible.
+- If additional response fields are needed, add them in a backward-compatible way.
+- Do not add a database.
+- Do not add another LLM call just for the UI.
+- Do not remove Breeth integration.
+- Do not change the core adaptive-questioning behavior.
+
+The panel should make the system's adaptive behavior demonstrable to a hackathon judge without overwhelming the candidate-facing experience.
+
+Add focused tests for any new serialization/API state required by the panel.
+```
