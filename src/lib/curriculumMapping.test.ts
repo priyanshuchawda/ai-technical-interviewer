@@ -51,7 +51,7 @@ describe("Canonical Curriculum Day Mapping & State Integrity Tests", () => {
       "I implemented structured logging using Python structlog to record JSON logs with trace IDs, token latency, and error metrics."
     );
 
-    const session = getSession(sessionId);
+    const session = await getSession(sessionId);
     expect(session).toBeDefined();
 
     // Check masteryState key 29
@@ -92,7 +92,7 @@ describe("Canonical Curriculum Day Mapping & State Integrity Tests", () => {
     expect(turn2.intelligence?.currentDay).toBe(28);
     expect(turn2.intelligence?.currentTopic).toBe("Docker & Kubernetes Deployment");
 
-    const session = getSession(sessionId);
+    const session = await getSession(sessionId);
 
     // Assert key 29 has title "Monitoring, Logging & Observability"
     const m29 = session?.masteryState.get(29);
@@ -104,7 +104,7 @@ describe("Canonical Curriculum Day Mapping & State Integrity Tests", () => {
   }, 25000);
 
   it("should preserve canonical day numbers and titles in final feedback recommendations", () => {
-    const session: InterviewSessionState = getSession("nonexistent-session") || {
+    const session: InterviewSessionState = {
       sessionId: "canonical-feedback-test",
       candidate: sarah,
       turnCount: 2,

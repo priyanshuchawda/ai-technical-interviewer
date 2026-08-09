@@ -1,4 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import os from "os";
+import path from "path";
+import fs from "fs/promises";
 import {
   saveSession,
   getSession,
@@ -8,6 +11,7 @@ import {
 } from "./sessionStore";
 import { InterviewSessionState } from "../types/interview";
 import candidatesData from "../../candidates.json";
+import { resetKvCache } from "./kv";
 
 function fakeSession(id: string): InterviewSessionState {
   return {
@@ -22,31 +26,62 @@ function fakeSession(id: string): InterviewSessionState {
 }
 
 describe("sessionStore", () => {
-  beforeEach(() => {
-    clearSessions();
+  beforeEach(async () => {
     delete process.env.SESSION_TTL_MS;
     delete process.env.MAX_SESSIONS;
+    delete process.env.SESSION_STORE;
+    delete process.env.SESSION_STORE_PATH;
+    resetKvCache();
+    await clearSessions();
   });
 
-  it("stores and retrieves a session", () => {
-    saveSession(fakeSession("s1"));
-    expect(getSession("s1")?.sessionId).toBe("s1");
-    expect(sessionCount()).toBe(1);
+  it("stores and retrieves a session", async () => {
+    await saveSession(fakeSession("s1"));
+    expect((await getSession("s1"))?.sessionId).toBe("s1");
+    expect(await sessionCount()).toBe(1);
   });
 
-  it("expires sessions after ttl", () => {
+  it("expires sessions after ttl", async () => {
     process.env.SESSION_TTL_MS = "1";
-    saveSession(fakeSession("old"));
+    await saveSession(fakeSession("old"));
     pruneExpiredSessions(Date.now() + 10);
-    expect(getSession("old")).toBeUndefined();
+    expect(await getSession("old")).toBeUndefined();
   });
 
-  it("evicts oldest session when cap is reached", () => {
+  it("evicts oldest session when cap is reached", async () => {
     process.env.MAX_SESSIONS = "2";
-    saveSession(fakeSession("a"));
-    saveSession(fakeSession("b"));
-    saveSession(fakeSession("c"));
-    expect(sessionCount()).toBe(2);
-    expect(getSession("c")).toBeDefined();
+    await saveSession(fakeSession("a"));
+    await saveSession(fakeSession("b"));
+    await saveSession(fakeSession("c"));
+    expect(await sessionCount()).toBe(2);
+    expect(await getSession("c")).toBeDefined();
+  });
+});
+
+describe("file session store", () => {
+  let dir = "";
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), "interview-sessions-"));
+    process.env.SESSION_STORE = "file";
+    process.env.SESSION_STORE_PATH = dir;
+    process.env.SESSION_TTL_MS = "60000";
+    resetKvCache();
+    await clearSessions();
+  });
+
+  afterEach(async () => {
+    delete process.env.SESSION_STORE;
+    delete process.env.SESSION_STORE_PATH;
+    resetKvCache();
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it("survives a process-local reload from disk", async () => {
+    await saveSession(fakeSession("durable-1"));
+    resetKvCache();
+    const restored = await getSession("durable-1");
+    expect(restored?.sessionId).toBe("durable-1");
+    expect(restored?.evaluatedDays.has(7)).toBe(true);
   });
 });

@@ -1,9 +1,28 @@
+import { getLockTtlSec, sharedKvEnabled } from "./config";
+import { getKv } from "./kv";
+
 const locks = new Set<string>();
 
-export function tryAcquireSessionLock(sessionId: string): (() => void) | null {
+function lockKey(sessionId: string): string {
+  return `interview:lock:${sessionId}`;
+}
+
+export async function tryAcquireSessionLock(
+  sessionId: string
+): Promise<(() => Promise<void>) | null> {
+  if (sharedKvEnabled()) {
+    const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const acquired = await getKv().setNx(lockKey(sessionId), token, getLockTtlSec());
+    if (!acquired) return null;
+    return async () => {
+      const current = await getKv().get(lockKey(sessionId));
+      if (current === token) await getKv().del(lockKey(sessionId));
+    };
+  }
+
   if (locks.has(sessionId)) return null;
   locks.add(sessionId);
-  return () => {
+  return async () => {
     locks.delete(sessionId);
   };
 }

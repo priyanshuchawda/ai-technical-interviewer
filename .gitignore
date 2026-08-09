@@ -13,6 +13,9 @@
 # testing
 /coverage
 
+# durable local session store
+/data
+
 # next.js
 /.next/
 /out/

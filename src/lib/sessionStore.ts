@@ -1,7 +1,9 @@
 import { InterviewSessionState } from "../types/interview";
+import { getMaxSessions, getSessionStoreKind, getSessionTtlMs } from "./config";
+import { getKv } from "./kv";
+import { decodeSession, encodeSession } from "./sessionCodec";
 
 const DEFAULT_TTL_MS = 30 * 60 * 1000;
-const DEFAULT_MAX_SESSIONS = 500;
 
 type SessionEntry = {
   session: InterviewSessionState;
@@ -10,14 +12,18 @@ type SessionEntry = {
 
 const sessions = new Map<string, SessionEntry>();
 
-export function getSessionTtlMs(): number {
-  const raw = Number(process.env.SESSION_TTL_MS);
-  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_TTL_MS;
+export { getSessionTtlMs, getMaxSessions } from "./config";
+
+function ttlMs(): number {
+  return getSessionTtlMs() || DEFAULT_TTL_MS;
 }
 
-export function getMaxSessions(): number {
-  const raw = Number(process.env.MAX_SESSIONS);
-  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_MAX_SESSIONS;
+function sessionKey(sessionId: string): string {
+  return `interview:session:${sessionId}`;
+}
+
+function durableEnabled(): boolean {
+  return getSessionStoreKind() !== "memory";
 }
 
 export function pruneExpiredSessions(now = Date.now()): number {
@@ -34,11 +40,22 @@ export function pruneExpiredSessions(now = Date.now()): number {
 function touch(sessionId: string, session: InterviewSessionState, now = Date.now()) {
   sessions.set(sessionId, {
     session,
-    expiresAt: now + getSessionTtlMs(),
+    expiresAt: now + ttlMs(),
   });
 }
 
-export function getSession(sessionId: string): InterviewSessionState | undefined {
+async function getDurable(sessionId: string): Promise<InterviewSessionState | undefined> {
+  const raw = await getKv().get(sessionKey(sessionId));
+  if (!raw) return undefined;
+  return decodeSession(raw) || undefined;
+}
+
+async function saveDurable(session: InterviewSessionState): Promise<void> {
+  await getKv().set(sessionKey(session.sessionId), encodeSession(session), Math.ceil(ttlMs() / 1000));
+}
+
+export async function getSession(sessionId: string): Promise<InterviewSessionState | undefined> {
+  if (durableEnabled()) return getDurable(sessionId);
   pruneExpiredSessions();
   const entry = sessions.get(sessionId);
   if (!entry) return undefined;
@@ -46,7 +63,11 @@ export function getSession(sessionId: string): InterviewSessionState | undefined
   return entry.session;
 }
 
-export function saveSession(session: InterviewSessionState): void {
+export async function saveSession(session: InterviewSessionState): Promise<void> {
+  if (durableEnabled()) {
+    await saveDurable(session);
+    return;
+  }
   pruneExpiredSessions();
   if (!sessions.has(session.sessionId) && sessions.size >= getMaxSessions()) {
     let oldestId: string | undefined;
@@ -62,15 +83,21 @@ export function saveSession(session: InterviewSessionState): void {
   touch(session.sessionId, session);
 }
 
-export function deleteSession(sessionId: string): void {
+export async function deleteSession(sessionId: string): Promise<void> {
+  if (durableEnabled()) {
+    await getKv().del(sessionKey(sessionId));
+    return;
+  }
   sessions.delete(sessionId);
 }
 
-export function clearSessions(): void {
+export async function clearSessions(): Promise<void> {
   sessions.clear();
+  if (durableEnabled()) await getKv().clear();
 }
 
-export function sessionCount(): number {
+export async function sessionCount(): Promise<number> {
+  if (durableEnabled()) return 0;
   pruneExpiredSessions();
   return sessions.size;
 }
