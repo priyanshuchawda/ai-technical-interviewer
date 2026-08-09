@@ -91,13 +91,14 @@ type Theme = "light" | "dark";
 type VoiceState = "idle" | "recording" | "processing" | "transcribed" | "error" | "unsupported";
 interface SpeechRecognitionResultLike { isFinal: boolean; 0: { transcript: string }; }
 interface SpeechRecognitionEventLike { resultIndex: number; results: ArrayLike<SpeechRecognitionResultLike>; }
+interface SpeechRecognitionErrorEventLike { error?: string; }
 interface SpeechRecognitionLike {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
   onstart: (() => void) | null;
   onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;
@@ -120,14 +121,21 @@ export default function InterviewPage() {
 
   // Drawer state for progressive disclosure
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [theme, setTheme] = useState<Theme>("light");
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === "undefined") return "light";
+    const storedTheme = window.localStorage.getItem("interview-theme") as Theme | null;
+    const systemTheme = typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    return storedTheme || systemTheme;
+  });
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
+  const [voiceError, setVoiceError] = useState("");
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [codingMode, setCodingMode] = useState(false);
   const [codeValue, setCodeValue] = useState("");
   const [codeEvaluation, setCodeEvaluation] = useState<CodeEvaluation | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const transcriptRef = useRef("");
+  const recognitionErrorRef = useRef(false);
 
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const requestControllerRef = useRef<AbortController | null>(null);
@@ -149,12 +157,6 @@ export default function InterviewPage() {
 
   useEffect(() => {
     void fetch("/api/csrf").catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    const storedTheme = window.localStorage.getItem("interview-theme") as Theme | null;
-    const systemTheme = typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    setTheme(storedTheme || systemTheme);
   }, []);
 
   useEffect(() => {
@@ -207,11 +209,14 @@ export default function InterviewPage() {
     };
     const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
     if (!Recognition) {
+      setVoiceError("Voice input is not supported in this browser");
       setVoiceState("unsupported");
       return;
     }
 
     transcriptRef.current = inputMessage;
+    recognitionErrorRef.current = false;
+    setVoiceError("");
     setRecordingSeconds(0);
     const recognition = new Recognition();
     recognition.continuous = true;
@@ -220,18 +225,42 @@ export default function InterviewPage() {
     recognition.onstart = () => setVoiceState("recording");
     recognition.onresult = (event) => {
       let transcript = transcriptRef.current;
+      let interimTranscript = "";
       for (let index = event.resultIndex; index < event.results.length; index += 1) {
-        transcript += event.results[index][0].transcript;
+        const result = event.results[index];
+        if (result.isFinal) transcript += result[0].transcript;
+        else interimTranscript += result[0].transcript;
       }
       transcriptRef.current = transcript;
-      setInputMessage(transcript);
+      setInputMessage(`${transcript} ${interimTranscript}`.trim());
     };
-    recognition.onerror = () => setVoiceState("error");
-    recognition.onend = () => setVoiceState(transcriptRef.current.trim() ? "transcribed" : "idle");
+    recognition.onerror = (event) => {
+      recognitionErrorRef.current = true;
+      const message = event.error === "not-allowed" || event.error === "service-not-allowed"
+        ? "Allow microphone access to speak"
+        : event.error === "no-speech"
+          ? "No speech detected — try again"
+          : "Voice input failed — try again";
+      setVoiceError(message);
+      setVoiceState("error");
+    };
+    recognition.onend = () => {
+      if (recognitionErrorRef.current) {
+        setVoiceState("error");
+        return;
+      }
+      setVoiceState(transcriptRef.current.trim() ? "transcribed" : "idle");
+      setInputMessage(transcriptRef.current);
+    };
     recognitionRef.current = recognition;
-    recognition.start();
+    try {
+      recognition.start();
+    } catch {
+      recognitionErrorRef.current = true;
+      setVoiceError("Voice input could not start — try again");
+      setVoiceState("error");
+    }
   };
-
   const runCodingTests = () => {
     if (!codingTask) return;
     setCodeEvaluation(evaluateCodeSubmission(codingTask, codeValue));
@@ -319,9 +348,9 @@ export default function InterviewPage() {
   }, [messages]);
 
   const latestEval = intelligence?.latestEvaluation;
-  const codingTask = useMemo(() => getTopicCodingTask(intelligence?.currentTopic || ""), [intelligence?.currentTopic]);
+  const codingTask = getTopicCodingTask(intelligence?.currentTopic || "");
   const themeLabel = theme === "light" ? "Dark mode" : "Light mode";
-  const voiceLabel = voiceState === "recording" ? "Listening…" : voiceState === "processing" ? "Transcribing…" : voiceState === "transcribed" ? "Transcribed" : voiceState === "error" ? "Try again" : voiceState === "unsupported" ? "Voice unavailable" : "Speak";
+  const voiceLabel = voiceState === "recording" ? "Listening…" : voiceState === "processing" ? "Transcribing…" : voiceState === "transcribed" ? "Transcribed" : voiceState === "error" || voiceState === "unsupported" ? voiceError || "Try again" : "Speak";
 
   return (
     <>
