@@ -20,6 +20,18 @@ export default defineConfig({
     maxConcurrency: 1,
     fileParallelism: false,
     testTimeout: 20000,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "lcov"],
+      include: ["src/lib/**/*.ts"],
+      exclude: ["src/lib/**/*.test.ts", "src/lib/evals/**"],
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 65,
+        statements: 80,
+      },
+    },
   },
   resolve: {
     alias: {

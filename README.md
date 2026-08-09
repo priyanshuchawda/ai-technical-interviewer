@@ -24,7 +24,7 @@ An enterprise-grade, stateful, multi-turn AI technical interviewer built with Ne
 - **Styling**: vanilla CSS design tokens
 - **Memory**: Breeth Graph API
 - **LLM**: Gemini for dynamic turns and feedback synthesis
-- **Testing**: Vitest unit tests + API integration script
+- **Testing**: Vitest unit tests with coverage gates + API integration script
 
 ## Getting started
 
