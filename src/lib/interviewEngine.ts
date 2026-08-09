@@ -1,4 +1,4 @@
-import { CandidateProfile, InterviewFeedback, InterviewSessionState, ResponseOutcome, TopicMastery } from "../types/interview";
+import { CandidateProfile, InterviewFeedback, InterviewSessionState, ResponseOutcome, TopicMastery, InterviewIntelligenceState } from "../types/interview";
 import { getCurriculumDay } from "./dataService";
 import { breethClient } from "./breethClient";
 import { generateGeminiContent, GeminiMessage } from "./geminiClient";
@@ -40,7 +40,7 @@ export async function processInterviewTurn(
   sessionId: string,
   candidateInput?: CandidateProfile,
   messageInput?: string
-): Promise<{ reply: string; done: boolean; feedback?: InterviewFeedback }> {
+): Promise<{ reply: string; done: boolean; feedback?: InterviewFeedback; intelligence?: InterviewIntelligenceState }> {
   let session = getSession(sessionId);
 
   // 1. Initial turn / Start Session
@@ -78,10 +78,19 @@ export async function processInterviewTurn(
     const endReply = `Thank you for completing the technical interview, ${session.candidate.member.name}. We have thoroughly evaluated your responses across the AI Cohort curriculum modules and generated your detailed assessment feedback.`;
 
     session.history.push({ role: "interviewer", content: endReply });
+    
+    const intelligence = buildInterviewIntelligenceState(
+      session,
+      session.currentQuestionDay || 7,
+      session.candidate.missions.find((m) => m.day === session!.currentQuestionDay) || { day: 7, title: "Final Evaluation" },
+      getCurriculumDay(session.currentQuestionDay || 7)
+    );
+
     return {
       reply: endReply,
       done: true,
       feedback,
+      intelligence,
     };
   }
 
@@ -136,6 +145,8 @@ export async function processInterviewTurn(
   // 5.5 Evaluate the answer and update mastery state
   if (messageInput) {
     const evaluation = evaluateAnswer(messageInput, curriculumDay, session.lastOutcome);
+    session.latestEvaluation = evaluation;
+
     const existingMastery = session.masteryState.get(targetDay);
     const updatedMastery = updateTopicMastery(
       existingMastery,
@@ -162,9 +173,70 @@ export async function processInterviewTurn(
   }
 
   session.history.push({ role: "interviewer", content: reply });
+
+  const intelligence = buildInterviewIntelligenceState(
+    session,
+    targetDay,
+    targetMission,
+    curriculumDay
+  );
+
   return {
     reply,
     done: false,
+    intelligence,
+  };
+}
+
+function buildInterviewIntelligenceState(
+  session: InterviewSessionState,
+  targetDay: number,
+  targetMission: any,
+  curriculumDay: any
+): InterviewIntelligenceState {
+  const turnsOnCurrentDay = session.turnsOnCurrentDay || 1;
+  const lastOutcome = session.lastOutcome;
+
+  let difficultyState = "Standard Adaptive Assessment";
+  if (turnsOnCurrentDay > 1 && (lastOutcome === "unknown" || lastOutcome === "weak")) {
+    difficultyState = "Prerequisite Recovery";
+  } else if (lastOutcome === "strong") {
+    difficultyState = "Deep-Dive / Advanced";
+  }
+
+  let whyThisQuestion = "";
+  if (session.turnCount === 0) {
+    const focusReason = session.intelligenceProfile?.recommendedFocusAreas[0]?.reason || "historical cohort signal";
+    whyThisQuestion = `Profile signal: Selected candidate's priority focus area (Day ${targetDay}: ${targetMission.title}) because ${focusReason}.`;
+  } else if (turnsOnCurrentDay > 1 && (lastOutcome === "unknown" || lastOutcome === "weak")) {
+    whyThisQuestion = `Previous answer: Candidate responded with '${lastOutcome}' on Day ${targetDay}. Staying on topic to test foundational prerequisite concepts before moving on.`;
+  } else if (lastOutcome === "strong") {
+    whyThisQuestion = `Current mastery: Candidate demonstrated strong technical understanding. Advancing to next curriculum focus area (Day ${targetDay}: ${targetMission.title}).`;
+  } else {
+    whyThisQuestion = `Curriculum objective: Evaluating candidate knowledge on Day ${targetDay} (${targetMission.title}) based on objective: ${curriculumDay?.objectives?.[0] || "core implementation"}.`;
+  }
+
+  const masteryScores = Array.from(session.masteryState.entries()).map(([day, m]) => ({
+    day,
+    topic: m.topic,
+    score: m.score,
+    attempts: m.attempts,
+    lastOutcome: m.lastOutcome,
+  }));
+
+  return {
+    currentDay: targetDay,
+    currentTopic: targetMission.title || `Day ${targetDay} Topic`,
+    progress: {
+      turnCount: session.turnCount,
+      totalTurns: 8,
+      evaluatedDaysCount: session.evaluatedDays.size,
+    },
+    difficultyState,
+    focusAreas: session.intelligenceProfile?.recommendedFocusAreas || [],
+    masteryScores,
+    latestEvaluation: session.latestEvaluation,
+    whyThisQuestion,
   };
 }
 

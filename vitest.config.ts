@@ -17,6 +17,9 @@ export default defineConfig({
     environment: "node",
     include: ["src/**/*.test.ts"],
     exclude: ["cogram-sdk-node/**", "cogram-sdk-python/**", "node_modules/**"],
+    maxConcurrency: 1,
+    fileParallelism: false,
+    testTimeout: 20000,
   },
   resolve: {
     alias: {
