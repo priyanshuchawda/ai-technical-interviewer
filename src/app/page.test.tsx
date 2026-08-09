@@ -46,7 +46,7 @@ describe("Interview page controls", () => {
     expect(screen.getByRole("button", { name: /start interview/i })).toBeEnabled();
     expect(screen.getByRole("button", { name: /assessment/i })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: /candidate/i })).toBeInTheDocument();
-    expect(screen.getByText("8 questions · Adaptive technical assessment")).toBeInTheDocument();
+    expect(screen.getByText("8 questions · Conversation + practical exercises")).toBeInTheDocument();
     expect(document.querySelector(".start-cand-name")).toHaveTextContent(/sarah johnson/i);
     await waitFor(() => expect(fetch).toHaveBeenCalled());
   });
@@ -89,7 +89,9 @@ describe("Interview page controls", () => {
     render(<InterviewPage />);
     await user.click(screen.getByRole("button", { name: /start interview/i }));
     expect(await screen.findByText(/how did you approach monitoring/i)).toBeInTheDocument();
-    expect(screen.getByText(/day 29/i)).toBeInTheDocument();
+    expect(screen.getByText(/monitoring, logging & observability/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /speak/i })).toBeInTheDocument();
+    expect(document.querySelector(".topic-meta")).not.toHaveTextContent(/day 29/i);
 
     const submit = screen.getByRole("button", { name: /submit/i });
     expect(submit).toBeDisabled();

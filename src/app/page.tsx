@@ -350,7 +350,8 @@ export default function InterviewPage() {
   const latestEval = intelligence?.latestEvaluation;
   const codingTask = getTopicCodingTask(intelligence?.currentTopic || "");
   const themeLabel = theme === "light" ? "Dark mode" : "Light mode";
-  const voiceLabel = voiceState === "recording" ? "Listening…" : voiceState === "processing" ? "Transcribing…" : voiceState === "transcribed" ? "Transcribed" : voiceState === "error" || voiceState === "unsupported" ? voiceError || "Try again" : "Speak";
+  const voiceLabel = voiceState === "recording" ? "Listening…" : voiceState === "processing" ? "Transcribing…" : voiceState === "transcribed" ? "Transcript ready" : voiceState === "error" || voiceState === "unsupported" ? voiceError || "Try again" : "Speak";
+  const reportTopics = intelligence?.masteryScores ?? [];
 
   return (
     <>
@@ -424,7 +425,7 @@ export default function InterviewPage() {
               <div className="start-cand-name">{m.name}</div>
               <div className="start-cand-role">{m.jobRole}</div>
               <div className="start-cand-meta">
-                <span>8 questions · Adaptive technical assessment</span>
+                <span>8 questions · Conversation + practical exercises</span>
               </div>
             </div>
             <div className="start-details">
@@ -432,13 +433,13 @@ export default function InterviewPage() {
                 A focused technical screen that follows your reasoning, tests the edges, and records evidence as you go.
               </p>
               <p className="start-subtext">
-                Questions adapt to cohort history and live performance.
+                Topics follow your answers, with room to go deeper where it matters.
               </p>
               <div className="start-plan">
               <div className="start-plan-label">Interview plan</div>
-              {profileFocusAreas.slice(0, 4).map((area, index) => (
+              {profileFocusAreas.slice(0, 4).map((area) => (
                 <div key={area.day} className="start-plan-row">
-                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <span aria-hidden="true">—</span>
                   <span>{area.title}</span>
                 </div>
               ))}
@@ -461,7 +462,7 @@ export default function InterviewPage() {
             {intelligence && (
               <div className="topic-header">
                 <div className="topic-meta">
-                  <span>Day {intelligence.currentDay}</span>
+                  <span>Question {Math.min(currentTurn + 1, totalTurns)} of {totalTurns}</span>
                   <span>·</span>
                   <span>{intelligence.currentTopic}</span>
                 </div>
@@ -480,10 +481,8 @@ export default function InterviewPage() {
               <div className={"adaptive-status " + assessmentPhase} role="status" aria-live="polite">
                 <span className="adaptive-status-mark">{assessmentPhase === "evaluating" ? "•••" : "✓"}</span>
                 <span className="adaptive-status-copy">
-                  <strong>{assessmentPhase === "evaluating" ? "Evaluating response" : intelligence?.adaptiveDecision?.label || "Response assessed"}</strong>
-                  {assessmentPhase === "assessed" && intelligence?.adaptiveDecision?.detail && (
-                    <span>{intelligence.adaptiveDecision.detail}</span>
-                  )}
+                  <strong>{assessmentPhase === "evaluating" ? "Thinking through that" : "Next question ready"}</strong>
+                  {assessmentPhase === "assessed" && <span>Based on what you just shared.</span>}
                 </span>
               </div>
             )}
@@ -502,7 +501,7 @@ export default function InterviewPage() {
                   <div className="ldot" />
                   <div className="ldot" />
                 </div>
-                <span>Evaluating response…</span>
+                <span>Preparing your next question…</span>
               </div>
             )}
 
@@ -610,34 +609,70 @@ export default function InterviewPage() {
 
             {/* Final Feedback Report */}
             {isDone && feedback && (
-              <div className="feedback-wrap">
+              <section className="feedback-wrap report-wrap" aria-labelledby="report-title">
                 <div className="fb-head">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                    stroke="var(--green-text)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    stroke="var(--mint)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
-                  Interview Complete — Assessment Feedback
+                  Technical assessment complete
                 </div>
-                <div className="fb-body">
-                  <p className="fb-summary">{feedback.summary}</p>
-                  <div className="fb-grid">
+                <div className="report-body">
+                  <div className="report-intro">
+                    <div className="report-kicker">Interview record</div>
+                    <h2 id="report-title">{m.name}</h2>
+                    <p>{m.jobRole} · Evidence captured from the live conversation</p>
+                  </div>
+                  <div className="report-summary">
                     <div>
-                      <div className="fb-col-lbl g">Key Strengths</div>
-                      <ul className="fb-list">{feedback.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul>
+                      <div className="fb-col-lbl b">Overall read</div>
+                      <p className="fb-summary">{feedback.summary}</p>
+                    </div>
+                    <div className="report-signal">
+                      <div className="fb-col-lbl g">Suggested next step</div>
+                      <strong>{feedback.gaps.length > 0 ? "Targeted technical follow-up" : "Progress to the next stage"}</strong>
+                      <span>{reportTopics.length || "Live"} evidence signal{reportTopics.length === 1 ? "" : "s"} available for review.</span>
+                    </div>
+                  </div>
+                  <div className="report-section">
+                    <div className="fb-col-lbl b">Observed topic signals</div>
+                    {reportTopics.length > 0 ? (
+                      <div className="report-topic-grid">
+                        {reportTopics.map((topic) => (
+                          <div className="report-topic" key={topic.day}>
+                            <div className="report-topic-top">
+                              <strong>{topic.topic}</strong>
+                              <span className={obTagClass(topic.lastOutcome)}>{obLabel(topic.lastOutcome)}</span>
+                            </div>
+                            <div className="report-topic-track">
+                              <span style={{ width: Math.round(topic.score * 100) + "%", background: mbFillColor(topic.score) }} />
+                            </div>
+                            <small>{Math.round(topic.score * 100)}% signal · {topic.attempts} response{topic.attempts === 1 ? "" : "s"}</small>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="report-empty">Live evidence is available in the assessment record.</p>
+                    )}
+                  </div>
+                  <div className="fb-grid report-columns">
+                    <div>
+                      <div className="fb-col-lbl g">What stood out</div>
+                      <ul className="fb-list">{feedback.strengths.map((strength, index) => <li key={index}>{strength}</li>)}</ul>
                     </div>
                     <div>
-                      <div className="fb-col-lbl a">Identified Gaps</div>
-                      <ul className="fb-list">{feedback.gaps.map((g, i) => <li key={i}>{g}</li>)}</ul>
+                      <div className="fb-col-lbl a">Areas to probe</div>
+                      <ul className="fb-list">{feedback.gaps.map((gap, index) => <li key={index}>{gap}</li>)}</ul>
                     </div>
                   </div>
                   {feedback.next.length > 0 && (
-                    <div>
-                      <div className="fb-col-lbl b">Recommended Next Steps</div>
-                      <ul className="fb-list">{feedback.next.map((n, i) => <li key={i}>{n}</li>)}</ul>
+                    <div className="report-section report-next">
+                      <div className="fb-col-lbl b">Recommended follow-through</div>
+                      <ul className="fb-list">{feedback.next.map((nextStep, index) => <li key={index}>{nextStep}</li>)}</ul>
                     </div>
                   )}
                 </div>
-              </div>
+              </section>
             )}
           </>
         )}
@@ -717,9 +752,9 @@ export default function InterviewPage() {
                   </div>
                 )}
 
-                {/* Next Decision */}
+                {/* Why this question */}
                 <div className="drawer-sec">
-                  <span className="drawer-eyebrow">Next Decision</span>
+                  <span className="drawer-eyebrow">Why this question</span>
                   <div className="why-box">
                     {parseWhy(intelligence.whyThisQuestion).map((r, i) => (
                       <div key={i} style={{ marginBottom: 4 }}>
@@ -738,7 +773,7 @@ export default function InterviewPage() {
                     <span>
                       {intelligence.masteryScores.length > 0
                         ? `${intelligence.masteryScores.length} topic${intelligence.masteryScores.length !== 1 ? "s" : ""} in session memory`
-                        : "Breeth Graph Memory active"}
+                        : "Session context available"}
                     </span>
                   </div>
                 </div>
