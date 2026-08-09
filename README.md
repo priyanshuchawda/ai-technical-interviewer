@@ -1,77 +1,77 @@
-# Autonomous AI Technical Interviewer Agent
+# AI Technical Interviewer
 
 ![Next.js](https://img.shields.io/badge/Next.js-16.3-black?logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?logo=typescript)
+![CI](https://github.com/priyanshuchawda/ai-technical-interviewer/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-An enterprise-grade, stateful, multi-turn AI Technical Interviewer built with Next.js App Router, TypeScript, and Breeth Graph Memory integration. The agent conducts realistic technical interviews for learners based on their journey through the 31-day AI Cohort curriculum.
+An enterprise-grade, stateful, multi-turn AI technical interviewer built with Next.js App Router, TypeScript, Breeth Graph Memory, and Gemini. The agent conducts realistic technical interviews for learners based on their journey through the 31-day AI Cohort curriculum.
 
----
+## Key features
 
-## 🌟 Key Features
+- **Multi-turn technical evaluation** across curriculum topics
+- **Adaptive questioning** based on completed, skipped, or multi-attempt missions
+- **Breeth Graph Memory** for contextual follow-ups
+- **Structured answer evaluation** with mastery tracking
+- **Evidence-backed feedback** (`summary`, `strengths`, `gaps`, `next`)
+- **Interview intelligence UI** for live assessment state
+- **`POST /api/interview`** matching the technical specification (`sessionId`, `candidate`, `message`, `done`, `feedback`)
 
-- **Multi-turn Technical Evaluation**: Conducts adaptive multi-turn conversations evaluating candidate understanding across curriculum topics.
-- **Dynamic Questioning & Memory**: Dynamically selects questions based on completed, skipped, or multi-attempt missions, syncing conversation turns into **Breeth Graph Memory** (`https://api.thebreeth.com/v1`).
-- **Strict Compliance with API Contract**: Exposes standard `POST /api/interview` matching the technical specification (`sessionId`, `candidate`, `message`, `done`, `feedback`).
-- **Structured Feedback Synthesis**: Generates actionable, structured post-interview reports detailing `summary`, `strengths`, `gaps`, and `next` steps.
-- **Modern Glassmorphism UI**: High-fidelity dark mode dashboard with live status indicators and real-time candidate assessment tools.
-
----
-
-## 🛠️ Architecture & Tech Stack
+## Architecture
 
 - **Framework**: Next.js App Router (React 19)
-- **Language**: TypeScript (Strict Mode)
-- **Styling**: Vanilla CSS Design Tokens (Glassmorphic dark aesthetic)
-- **Memory Engine**: Breeth Graph SDK Integration (`breth_sdk.md`)
-- **Testing**: Automated end-to-end integration tests using `tsx`
+- **Language**: TypeScript (strict)
+- **Styling**: vanilla CSS design tokens
+- **Memory**: Breeth Graph API
+- **LLM**: Gemini for dynamic turns and feedback synthesis
+- **Testing**: Vitest unit tests + API integration script
 
----
+## Getting started
 
-## 🚀 Getting Started
-
-### 1. Installation
+### 1. Install
 
 ```bash
 npm install
 ```
 
-### 2. Configure Environment Variables
+### 2. Configure environment
 
-Create `.env.local`:
+Copy the example env file:
+
+```bash
+cp .env.example .env.local
+```
+
+Then fill in `.env.local`:
 
 ```env
 BREETH_API_KEY=""
 BREETH_API_URL="https://api.thebreeth.com"
+GEMINI_API_KEY=""
+GEMINI_MODEL="gemini-3.5-flash-lite"
 ```
 
-### 3. Run Development Server
+Never commit `.env.local` or real API keys.
+
+### 3. Run
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3000](http://localhost:3000).
 
----
-
-## 🧪 Live Verification & Testing
-
-Run the automated API integration test script:
+## Verification
 
 ```bash
+npm test
+npm run lint
+npm run build
 npx tsx src/scripts/test-api.ts
 ```
 
-Build and lint verification:
+The API test expects the dev server to be running.
 
-```bash
-npm run lint
-npm run build
-```
+## License
 
----
-
-## 📄 License
-
-MIT License.
+MIT
