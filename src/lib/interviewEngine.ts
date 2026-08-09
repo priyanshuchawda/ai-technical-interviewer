@@ -1,9 +1,10 @@
-import { CandidateProfile, InterviewFeedback, InterviewSessionState } from "../types/interview";
+import { CandidateProfile, InterviewFeedback, InterviewSessionState, ResponseOutcome } from "../types/interview";
 import { getCurriculumDay } from "./dataService";
 import { breethClient } from "./breethClient";
 import { generateGeminiContent, GeminiMessage } from "./geminiClient";
 import { buildInterviewerSystemPrompt, buildFeedbackSystemPrompt } from "./prompts";
 import { generateCandidateProfile } from "./candidateProfiler";
+import { classifyResponseOutcome } from "./responseClassifier";
 
 // Global session state cache (In-memory for active API sessions)
 const sessions = new Map<string, InterviewSessionState>();
@@ -14,11 +15,17 @@ export function getSession(sessionId: string): InterviewSessionState | undefined
 
 export function createSession(sessionId: string, candidate: CandidateProfile): InterviewSessionState {
   const intelligenceProfile = generateCandidateProfile(candidate);
+
+  // Requirement 1: Choose initial focus area from candidate profile
+  const initialFocusDay = intelligenceProfile.recommendedFocusAreas[0]?.day || candidate.missions[0]?.day || 7;
+
   const state: InterviewSessionState = {
     sessionId,
     candidate,
     turnCount: 0,
-    evaluatedDays: new Set<number>(),
+    evaluatedDays: new Set<number>([initialFocusDay]),
+    currentQuestionDay: initialFocusDay,
+    turnsOnCurrentDay: 1,
     history: [],
     done: false,
     intelligenceProfile,
@@ -42,12 +49,17 @@ export async function processInterviewTurn(
     session = createSession(sessionId, candidateInput);
   }
 
-  // 2. Add incoming candidate message to history if provided
+  // 2. Add incoming candidate message to history if provided & classify response outcome
+  let lastOutcome: ResponseOutcome | undefined;
   if (messageInput) {
     session.history.push({ role: "candidate", content: messageInput });
     session.turnCount += 1;
 
-    // Stream to Breeth memory graph asynchronously
+    // Requirement 5: Classify answer into structured outcome (strong, partial, weak, unknown)
+    lastOutcome = classifyResponseOutcome(messageInput);
+    session.lastOutcome = lastOutcome;
+
+    // Stream to Breeth memory graph asynchronously (Preserve Breeth integration)
     breethClient.addEpisode([
       { role: "user", content: `[Candidate ${session.candidate.member.name}] ${messageInput}` }
     ]).catch(() => {});
@@ -71,18 +83,41 @@ export async function processInterviewTurn(
     };
   }
 
-  // 4. Select target mission & day topic
-  const candidateMissions = session.candidate.missions;
-  const unassessedMissions = candidateMissions.filter((m) => !session!.evaluatedDays.has(m.day));
+  // 4. Determine target day & topic using profile-driven adaptive selection
+  let targetDay = session.currentQuestionDay || 7;
+  const turnsOnCurrentDay = session.turnsOnCurrentDay || 1;
 
-  const targetMission = unassessedMissions.length > 0
-    ? unassessedMissions[session.turnCount % unassessedMissions.length]
-    : candidateMissions[session.turnCount % candidateMissions.length];
+  if (messageInput) {
+    // Requirements 6 & 8: If answer is unknown or weak, stay on current topic to ask simpler prerequisite unless already spent 2 turns
+    if ((lastOutcome === "unknown" || lastOutcome === "weak") && turnsOnCurrentDay < 2) {
+      targetDay = session.currentQuestionDay!;
+      session.turnsOnCurrentDay = turnsOnCurrentDay + 1;
+    } else {
+      // Requirements 2 & 7: Advance to next focus area or unassessed curriculum day
+      const candidateFocusDays = session.intelligenceProfile?.recommendedFocusAreas.map((f) => f.day) || [];
+      const candidateMissionDays = session.candidate.missions.map((m) => m.day);
 
-  session.evaluatedDays.add(targetMission.day);
-  session.currentQuestionDay = targetMission.day;
+      const candidateTargetDays = Array.from(new Set([...candidateFocusDays, ...candidateMissionDays]));
+      const unassessedDays = candidateTargetDays.filter((day) => !session!.evaluatedDays.has(day));
 
-  const curriculumDay = getCurriculumDay(targetMission.day);
+      if (unassessedDays.length > 0) {
+        targetDay = unassessedDays[0];
+      } else {
+        targetDay = candidateTargetDays[session.turnCount % candidateTargetDays.length];
+      }
+
+      session.evaluatedDays.add(targetDay);
+      session.currentQuestionDay = targetDay;
+      session.turnsOnCurrentDay = 1;
+    }
+  }
+
+  // Requirement 3: Include relevant curriculum day/title/objectives as grounding context
+  const targetMission = session.candidate.missions.find((m) => m.day === targetDay) || {
+    day: targetDay,
+    title: `Day ${targetDay} Curriculum Module`,
+  };
+  const curriculumDay = getCurriculumDay(targetDay);
 
   // 5. Generate dynamic turn response using Gemini 3.5 Flash Lite
   let reply = "";
@@ -92,8 +127,10 @@ export async function processInterviewTurn(
     console.error("[Gemini AI Generation Error, falling back to static prompt]:", err);
     if (session.turnCount === 0) {
       reply = `Welcome ${session.candidate.member.name} (${session.candidate.member.jobRole}). Let's start your technical evaluation! On Day ${targetMission.day} you tackled "${targetMission.title}". Could you explain your implementation and core architectural choices?`;
+    } else if (lastOutcome === "unknown" || lastOutcome === "weak") {
+      reply = `Let's break down Day ${targetMission.day} (${targetMission.title}) step by step. What is the fundamental concept behind ${curriculumDay?.objectives?.[0] || "this topic"}?`;
     } else {
-      reply = `Great points. Moving to Day ${targetMission.day} (${targetMission.title}): ${curriculumDay?.objectives?.[0] || "How did you design this system module?"} What key technical trade-offs or edge cases did you navigate during your ${targetMission.attempts || 1} attempt(s)?`;
+      reply = `Great points. Moving to Day ${targetMission.day} (${targetMission.title}): ${curriculumDay?.objectives?.[0] || "How did you design this system module?"} What key technical trade-offs did you navigate?`;
     }
   }
 
@@ -114,7 +151,9 @@ async function generateTurnWithGemini(
     candidate,
     targetMission,
     curriculumDay,
-    session.intelligenceProfile
+    session.intelligenceProfile,
+    session.lastOutcome,
+    session.turnsOnCurrentDay
   );
 
   // Build message contents for Gemini

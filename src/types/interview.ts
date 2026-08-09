@@ -42,6 +42,8 @@ export interface CandidateIntelligenceProfile {
   }>;
 }
 
+export type ResponseOutcome = "strong" | "partial" | "weak" | "unknown";
+
 export interface CurriculumDay {
   day: number;
   title: string;
@@ -107,6 +109,8 @@ export interface InterviewSessionState {
   evaluatedDays: Set<number>;
   history: Array<{ role: "interviewer" | "candidate"; content: string }>;
   currentQuestionDay?: number;
+  turnsOnCurrentDay?: number;
+  lastOutcome?: ResponseOutcome;
   done: boolean;
   feedback?: InterviewFeedback;
   intelligenceProfile?: CandidateIntelligenceProfile;
