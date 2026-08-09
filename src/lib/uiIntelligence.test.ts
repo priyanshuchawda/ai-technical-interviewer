@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { processInterviewTurn, getSession } from "./interviewEngine";
+import { processInterviewTurn } from "./interviewEngine";
 import candidatesData from "../../candidates.json";
 
 describe("Interview Intelligence State & UI Payload Tests", () => {

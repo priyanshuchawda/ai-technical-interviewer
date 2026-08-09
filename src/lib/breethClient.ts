@@ -48,16 +48,22 @@ export class BreethClient {
       clearTimeout(timeoutId);
       if (!res.ok) return [];
 
-      const data = await res.json();
+      const data = await res.json() as {
+        episodes?: unknown[];
+        results?: unknown[];
+        memories?: unknown[];
+      };
       const rawResults = data.episodes || data.results || data.memories || [];
-      
-      return rawResults.map((item: any) => {
+
+      return rawResults.map((item) => {
         if (typeof item === "string") return item;
-        if (item.content) return item.content;
-        if (item.narrative) return item.narrative;
-        if (item.summary) return item.summary;
+        if (!item || typeof item !== "object") return "";
+        const record = item as { content?: unknown; narrative?: unknown; summary?: unknown };
+        if (typeof record.content === "string") return record.content;
+        if (typeof record.narrative === "string") return record.narrative;
+        if (typeof record.summary === "string") return record.summary;
         return JSON.stringify(item);
-      }).filter((text: string) => typeof text === "string" && text.trim().length > 0);
+      }).filter((text) => text.trim().length > 0);
     } catch (err) {
       clearTimeout(timeoutId);
       console.warn("[BreethClient] Best-effort memory search skipped:", err instanceof Error ? err.message : err);

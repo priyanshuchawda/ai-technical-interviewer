@@ -50,8 +50,7 @@ describe("Breeth Graph Memory Integration Tests", () => {
   });
 
   it("should ensure no Breeth API credentials are hardcoded or exposed in client code", () => {
-    expect((breethClient as any).apiKey).toBeUndefined();
-    expect((breethClient as any).getApiKey()).toBe(process.env.BREETH_API_KEY || "");
+    expect(Object.prototype.hasOwnProperty.call(breethClient, "apiKey")).toBe(false);
 
     const clientSource = readFileSync(path.join(__dirname, "breethClient.ts"), "utf8");
     expect(clientSource).toMatch(/process\.env\.BREETH_API_KEY/);

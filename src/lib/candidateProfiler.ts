@@ -6,7 +6,7 @@ import { getCurriculumDay } from "./dataService";
  * Always resolves canonical curriculum day titles via getCurriculumDay(day).
  */
 export function generateCandidateProfile(candidate: CandidateProfile): CandidateIntelligenceProfile {
-  const { member, missions, signals } = candidate;
+  const { member, missions } = candidate;
 
   // Helper to get canonical title for any mission day
   const getCanonicalTitle = (m: { day: number; title: string }) => {

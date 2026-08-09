@@ -8,7 +8,7 @@ import { classifyResponseOutcome } from "./responseClassifier";
 export function evaluateAnswer(
   answer: string,
   curriculumDay: CurriculumDay | undefined,
-  previousOutcome?: ResponseOutcome
+  _previousOutcome?: ResponseOutcome
 ): AnswerEvaluation {
   const outcome = classifyResponseOutcome(answer, curriculumDay);
   const lowerAnswer = answer.toLowerCase().trim();

@@ -1,11 +1,11 @@
-import { CandidateProfile, CandidateIntelligenceProfile, CurriculumDay, ResponseOutcome, TopicMastery, InterviewFeedback } from "../types/interview";
+import { CandidateProfile, CandidateIntelligenceProfile, CurriculumDay, Mission, ResponseOutcome, TopicMastery, InterviewFeedback } from "../types/interview";
 
 /**
  * System prompt template for conducting dynamic multi-turn technical interviews.
  */
 export function buildInterviewerSystemPrompt(
   candidate: CandidateProfile,
-  targetMission: any,
+  targetMission: Pick<Mission, "day" | "title">,
   curriculumDay: CurriculumDay | undefined,
   intelligenceProfile?: CandidateIntelligenceProfile,
   lastOutcome?: ResponseOutcome,
