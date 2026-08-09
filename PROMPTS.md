@@ -622,3 +622,28 @@ Before finishing, verify the UI at normal 100% browser zoom on a 1440px desktop 
 
 After implementation, run the full test suite and production build. If both pass, commit the changes with an appropriate conventional commit message and push to https://github.com/priyanshuchawda/autonomous-ai-interviewer.
 ```
+
+## Product Simplicity & Information Hierarchy Redesign Implementation Prompt
+```
+Redesign the Autonomous Interviewer UI again, but this time prioritize PRODUCT SIMPLICITY and INFORMATION HIERARCHY over showing every piece of available data.
+
+The current UI feels like an admin dashboard. I do NOT want that.
+The product should feel like a real, premium technical interview application: focused, quiet, professional, developer-oriented, and extremely clean.
+
+Think: modern developer tool, technical interview workspace, Linear-level restraint, IDE/editor-level focus, professional assessment software.
+The interview itself is the product. Everything else is supporting information.
+
+KEY ARCHITECTURAL CHANGES:
+1. REMOVE INFORMATION OVERLOAD: Use progressive disclosure. Assessment intelligence lives in a compact right-side slide-over Assessment drawer.
+2. STATE A — BEFORE THE INTERVIEW: Minimal start briefing (Candidate name, role, 8 questions · Adaptive technical assessment, Start interview button). No dashboard cards or statistics.
+3. STATE B — ACTIVE INTERVIEW: Single focused workspace occupying 85-90% of the viewport width.
+4. ELEGANT PROGRESS: Segmented line track below curriculum topic + Header progress counter (03 / 08).
+5. PROMINENT QUESTION HERO: Large prominent typography (20-24px), plain INTERVIEWER label (no avatars or glowing chatbot bubbles).
+6. EDITORIAL TRANSCRIPT: Understated transcript rows with subtle left borders for candidate responses.
+7. COMFORTABLE COMPOSER: Large textarea, ⌘ Enter to submit, compact blue CTA button.
+8. ASSESMENT DRAWER: Toggled by [Assessment] button in header. Contains topic, mastery %, latest signal, evidence coverage, next decision, Breeth memory, and interview plan.
+9. COLOR PALETTE: Dark Linear-inspired theme (#0B0D10 background, #111419 surface, #15181E raised, #252A32 borders, #E7E9ED text, #4F8CFF accent blue).
+10. PRESERVE FUNCTIONALITY: All backend logic, candidateProfiler, adaptive questioning, Breeth memory, answer evaluation, mastery tracking, feedback generation, and API contracts remain untouched.
+
+GIT: git commit -m "refactor: simplify interview workspace ui"
+```
