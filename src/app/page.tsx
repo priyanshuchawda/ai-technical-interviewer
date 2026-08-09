@@ -133,6 +133,7 @@ export default function InterviewPage() {
   const [codingMode, setCodingMode] = useState(false);
   const [codeValue, setCodeValue] = useState("");
   const [codeEvaluation, setCodeEvaluation] = useState<CodeEvaluation | null>(null);
+  const [pendingCodingSubmission, setPendingCodingSubmission] = useState<{ taskId: string; code: string } | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const transcriptRef = useRef("");
   const recognitionErrorRef = useRef(false);
@@ -184,6 +185,7 @@ export default function InterviewPage() {
       if (res.ok && data.reply) {
         setMessages([{ role: "interviewer", content: data.reply }]);
         if (data.intelligence) setIntelligence(data.intelligence);
+        setPendingCodingSubmission(null);
         setIsStarted(true);
       } else {
         setRequestError(data.error || data.message || "Could not start the interview. Retry in a moment.");
@@ -270,7 +272,8 @@ export default function InterviewPage() {
     if (!codingTask) return;
     const evaluation = codeEvaluation || evaluateCodeSubmission(codingTask, codeValue);
     setCodeEvaluation(evaluation);
-    setInputMessage("I also completed the optional coding check for " + codingTask.title + ": " + evaluation.passed + " of " + evaluation.total + " checks passed.");
+    setPendingCodingSubmission({ taskId: codingTask.id, code: codeValue });
+    setInputMessage("I completed the coding check and can talk through the implementation.");
     setCodingMode(false);
   };
   const cancelRequest = () => {
@@ -293,13 +296,14 @@ export default function InterviewPage() {
       const res = await fetch("/api/interview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, message: text }),
+        body: JSON.stringify({ sessionId, message: text, codingSubmission: pendingCodingSubmission || undefined }),
         signal: controller.signal,
       });
       const data = await res.json();
       if (res.ok) {
         setMessages((p) => [...p, { role: "interviewer", content: data.reply }]);
         if (data.intelligence) setIntelligence(data.intelligence);
+        setPendingCodingSubmission(null);
         setAssessmentPhase("assessed");
         window.setTimeout(() => setAssessmentPhase("idle"), 2200);
         if (data.done) {
@@ -352,6 +356,9 @@ export default function InterviewPage() {
   const themeLabel = theme === "light" ? "Dark mode" : "Light mode";
   const voiceLabel = voiceState === "recording" ? "Listening…" : voiceState === "processing" ? "Transcribing…" : voiceState === "transcribed" ? "Transcript ready" : voiceState === "error" || voiceState === "unsupported" ? voiceError || "Try again" : "Speak";
   const reportTopics = intelligence?.masteryScores ?? [];
+  const codingEvidence = intelligence?.codingEvidence ?? [];
+  const evidenceAttempts = reportTopics.reduce((total, topic) => total + topic.attempts, 0);
+  const evidenceConfidence = reportTopics.length >= 4 && evidenceAttempts >= 6 ? "High" : reportTopics.length >= 2 && evidenceAttempts >= 3 ? "Medium" : "Limited";
 
   return (
     <>
@@ -631,7 +638,7 @@ export default function InterviewPage() {
                     <div className="report-signal">
                       <div className="fb-col-lbl g">Suggested next step</div>
                       <strong>{feedback.gaps.length > 0 ? "Targeted technical follow-up" : "Progress to the next stage"}</strong>
-                      <span>{reportTopics.length || "Live"} evidence signal{reportTopics.length === 1 ? "" : "s"} available for review.</span>
+                      <span>Evidence confidence: {evidenceConfidence} · {reportTopics.length || "Live"} topic signal{reportTopics.length === 1 ? "" : "s"} available.</span>
                     </div>
                   </div>
                   <div className="report-section">
@@ -655,6 +662,12 @@ export default function InterviewPage() {
                       <p className="report-empty">Live evidence is available in the assessment record.</p>
                     )}
                   </div>
+                  {codingEvidence.length > 0 && (
+                    <div className="report-section report-practical">
+                      <div className="fb-col-lbl g">Practical evidence</div>
+                      <ul className="fb-list">{codingEvidence.map((evidence) => <li key={evidence.taskId}>{evidence.title} · {evidence.passed}/{evidence.total} checks passed</li>)}</ul>
+                    </div>
+                  )}
                   <div className="fb-grid report-columns">
                     <div>
                       <div className="fb-col-lbl g">What stood out</div>
@@ -699,7 +712,7 @@ export default function InterviewPage() {
                 <div className="drawer-sec">
                   <span className="drawer-eyebrow">Topic</span>
                   <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ink-1)" }}>
-                    Day {intelligence.currentDay} · {intelligence.currentTopic}
+                    Day {intelligence.currentTopic}
                   </div>
                 </div>
 
@@ -752,6 +765,16 @@ export default function InterviewPage() {
                   </div>
                 )}
 
+                {codingEvidence.length > 0 && (
+                  <div className="drawer-sec">
+                    <span className="drawer-eyebrow">Practical Evidence</span>
+                    <div className="clist">
+                      {codingEvidence.map((evidence) => (
+                        <div key={evidence.taskId} className="ci"><span className="ci-g">✓</span><span>{evidence.title} · {evidence.passed}/{evidence.total} checks</span></div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {/* Why this question */}
                 <div className="drawer-sec">
                   <span className="drawer-eyebrow">Why this question</span>
@@ -785,7 +808,7 @@ export default function InterviewPage() {
                     {profileFocusAreas.map((fa, i) => (
                       <div key={fa.day} className="plan-item-drawer">
                         <span className="plan-num-drawer">{String(i + 1).padStart(2, "0")}</span>
-                        <span>Day {fa.day} — {fa.title}</span>
+                        <span>{fa.title}</span>
                       </div>
                     ))}
                   </div>
@@ -799,7 +822,7 @@ export default function InterviewPage() {
                     <div key={fa.day} className="plan-item-drawer">
                       <span className="plan-num-drawer">{String(i + 1).padStart(2, "0")}</span>
                       <div>
-                        <div style={{ fontWeight: 600 }}>Day {fa.day} — {fa.title}</div>
+                        <div style={{ fontWeight: 600 }}>{fa.title}</div>
                         <div style={{ fontSize: 10, color: "var(--ink-3)" }}>{fa.reason}</div>
                       </div>
                     </div>

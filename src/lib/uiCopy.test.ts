@@ -15,12 +15,14 @@ const requiredCopy = [
   "⌘/Ctrl Enter to submit",
   "Submit →",
   "Cancel",
-  "Interview Complete",
-  "Key Strengths",
-  "Identified Gaps",
-  "Recommended Next Steps",
+  "Technical assessment complete",
+  "What stood out",
+  "Areas to probe",
+  "Recommended follow-through",
   "Interview Plan",
-  "Evaluating response",
+  "Thinking through that",
+  "Open coding task",
+  "Speak",
 ];
 
 describe("interview UI copy", () => {

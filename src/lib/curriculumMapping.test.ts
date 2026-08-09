@@ -72,25 +72,33 @@ describe("Canonical Curriculum Day Mapping & State Integrity Tests", () => {
     // Init (Day 29)
     await processInterviewTurn(sessionId, sarah);
 
-    // Turn 1 on Day 29 -> strong answer -> advances to Day 12
+    // First strong answer on Day 29 earns a deeper probe before advancing.
     const turn1 = await processInterviewTurn(
       sessionId,
       undefined,
       "I implemented structured logging with Python structlog to capture JSON metrics and token latency."
     );
 
-    expect(turn1.intelligence?.currentDay).toBe(12);
-    expect(turn1.intelligence?.currentTopic).toBe("Prompt Engineering Fundamentals");
+    expect(turn1.intelligence?.currentDay).toBe(29);
+    expect(turn1.intelligence?.currentTopic).toBe("Monitoring, Logging & Observability");
 
     // Turn 2 on Day 12 -> strong answer -> advances to Day 28
     const turn2 = await processInterviewTurn(
       sessionId,
       undefined,
-      "I designed system prompts using few-shot example templates and chain of thought reasoning."
+      "I added Prometheus metrics, trace IDs, and dashboards to diagnose production latency."
     );
 
-    expect(turn2.intelligence?.currentDay).toBe(28);
-    expect(turn2.intelligence?.currentTopic).toBe("Docker & Kubernetes Deployment");
+    expect(turn2.intelligence?.currentDay).toBe(12);
+    expect(turn2.intelligence?.currentTopic).toBe("Prompt Engineering Fundamentals");
+
+    const turn3 = await processInterviewTurn(
+      sessionId,
+      undefined,
+      "I designed system prompts using few-shot example templates and explicit evaluation cases."
+    );
+    expect(turn3.intelligence?.currentDay).toBe(12);
+    expect(turn3.intelligence?.currentTopic).toBe("Prompt Engineering Fundamentals");
 
     const session = await getSession(sessionId);
 
@@ -119,7 +127,7 @@ describe("Canonical Curriculum Day Mapping & State Integrity Tests", () => {
 
     const feedback = generateEvidenceBackedFeedback(session);
 
-    expect(feedback.gaps.some((g) => g.includes("Day 29 (Monitoring, Logging & Observability)"))).toBe(true);
-    expect(feedback.next.some((n) => n.includes("Day 29 (Monitoring, Logging & Observability)"))).toBe(true);
+    expect(feedback.gaps.some((g) => g.includes("Monitoring, Logging & Observability"))).toBe(true);
+    expect(feedback.next.some((n) => n.includes("Monitoring, Logging & Observability"))).toBe(true);
   });
 });

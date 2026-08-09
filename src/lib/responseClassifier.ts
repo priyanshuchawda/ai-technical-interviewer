@@ -19,15 +19,6 @@ const UNKNOWN_PATTERNS = [
   "cant recall",
 ];
 
-const WEAK_PATTERNS = [
-  "maybe",
-  "i think",
-  "guess",
-  "not completely sure",
-  "sort of",
-  "kind of",
-];
-
 function normalizeWord(word: string): string {
   let w = word.toLowerCase().trim();
   if (w.endsWith("ings")) w = w.slice(0, -4);
@@ -80,6 +71,14 @@ function getOtherDaysKeywords(currentDayNumber?: number): Set<string> {
   return set;
 }
 
+
+function hasContrastingKnowledge(lower: string): boolean {
+  return /\b(but|however|although|i'd|i would|i've|i have\s+(used|worked|implemented|experience|seen)|probably|likely)\b/.test(lower);
+}
+
+function isClarificationRequest(lower: string): boolean {
+  return /\b(can you|could you|would you|please)\s+(give|share|show|provide|clarify)\b/.test(lower) || /^(example|clarify|clarification)[?!. ]*$/.test(lower);
+}
 export function classifyResponseOutcome(
   message?: string,
   curriculumDay?: CurriculumDay
@@ -90,9 +89,13 @@ export function classifyResponseOutcome(
 
   const lower = message.trim().toLowerCase();
 
-  // 1. Check unknown pattern match
-  if (UNKNOWN_PATTERNS.some((pattern) => lower.includes(pattern))) {
+  // 1. Separate explicit lack of knowledge from qualified uncertainty.
+  const containsUnknownPhrase = UNKNOWN_PATTERNS.some((pattern) => lower.includes(pattern));
+  if (containsUnknownPhrase && !hasContrastingKnowledge(lower)) {
     return "unknown";
+  }
+  if (isClarificationRequest(lower) && !containsUnknownPhrase) {
+    return "partial";
   }
 
   // 2. Relevance Check against Curriculum Day
@@ -118,9 +121,17 @@ export function classifyResponseOutcome(
     }
   }
 
-  // 3. Check weak pattern match or extremely brief answer
-  if (WEAK_PATTERNS.some((pattern) => lower.includes(pattern)) || lower.length < 15) {
+  // 3. Treat a bare hedge as weak, but do not downgrade a substantive uncertain answer.
+  const bareUncertainty = /^(maybe|i think|guess|not completely sure|sort of|kind of)[.! ]*$/.test(lower);
+  if (bareUncertainty || lower.length < 15) {
     return "weak";
+  }
+  const qualifiedUncertainty = /\b(maybe|i think|guess|not completely sure|sort of|kind of)\b/.test(lower);
+  if (qualifiedUncertainty) {
+    return /\b(would|probably|use|using|implement|implemented|build|built|design|designed|because|but|however)\b/.test(lower) ? "partial" : "weak";
+  }
+  if (/\b(have not used|haven\x27t used|not familiar with|unfamiliar with)\b/.test(lower) && hasContrastingKnowledge(lower)) {
+    return "partial";
   }
 
   // 4. Check strong response indicators
@@ -128,7 +139,7 @@ export function classifyResponseOutcome(
   const technicalKeywords = [
     "vector", "embedding", "pipeline", "latency", "rag", "mcp", "docker",
     "kubernetes", "api", "architecture", "prompt", "memory", "agent",
-    "retrieval", "database", "index", "scaling", "observability", "metrics", "log", "logging"
+    "retrieval", "database", "index", "scaling", "observability", "metrics", "log", "logging", "trace", "traces", "counter", "counters", "dashboard", "dashboards", "failure", "failures", "request", "requests", "prometheus", "opentelemetry", "structured"
   ];
 
   const hasTechnicalTerm = technicalKeywords.some((term) => lower.includes(term));

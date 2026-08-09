@@ -60,6 +60,10 @@ export function getOptionalCodingTask(topic: string): CodeTask | null {
   return null;
 }
 
+export function getCodingTaskById(taskId: string): CodeTask | null {
+  return tasks.find((task) => task.id === taskId) || null;
+}
+
 export function getCodingTask(topic: string): CodeTask {
   return getOptionalCodingTask(topic) || tasks[0];
 }

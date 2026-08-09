@@ -1,4 +1,4 @@
-import { CandidateProfile, CurriculumDay, InterviewFeedback, InterviewSessionState, Mission, ResponseOutcome, TopicMastery, InterviewIntelligenceState } from "../types/interview";
+import { CandidateProfile, CurriculumDay, InterviewFeedback, InterviewSessionState, Mission, ResponseOutcome, TopicMastery, InterviewIntelligenceState, CodingEvidence, CodingSubmission } from "../types/interview";
 import { getCurriculumDay } from "./dataService";
 import { breethClient } from "./breethClient";
 import { generateGeminiContent, GeminiMessage } from "./geminiClient";
@@ -13,6 +13,7 @@ import { log, sessionRef } from "./logger";
 import { detectPromptInjection, wrapUntrustedAnswer } from "./promptGuard";
 import { compactHistory } from "./historyCompact";
 import { interviewFeedbackSchema } from "./feedbackSchema";
+import { evaluateCodeSubmission, getCodingTaskById } from "./codingTasks";
 
 export { getSession } from "./sessionStore";
 
@@ -33,6 +34,7 @@ export async function createSession(sessionId: string, candidate: CandidateProfi
     done: false,
     intelligenceProfile,
     masteryState: new Map<number, TopicMastery>(),
+    codingEvidence: [],
   };
   await saveSession(state);
   return state;
@@ -41,7 +43,8 @@ export async function createSession(sessionId: string, candidate: CandidateProfi
 export async function processInterviewTurn(
   sessionId: string,
   candidateInput?: CandidateProfile,
-  messageInput?: string
+  messageInput?: string,
+  codingSubmission?: CodingSubmission
 ): Promise<{ reply: string; done: boolean; feedback?: InterviewFeedback; intelligence?: InterviewIntelligenceState }> {
   let session = await getSession(sessionId);
 
@@ -51,6 +54,22 @@ export async function processInterviewTurn(
       throw new Error("Candidate profile is required to initialize a new interview session.");
     }
     session = await createSession(sessionId, candidateInput);
+  }
+
+  if (session.done) {
+    const completedReply = [...session.history].reverse().find((item) => item.role === "interviewer")?.content
+      || `Thanks for the thoughtful discussion, ${displayFirstName(session.candidate)}. The interview is complete.`;
+    return {
+      reply: completedReply,
+      done: true,
+      feedback: session.feedback,
+      intelligence: buildInterviewIntelligenceState(
+        session,
+        session.currentQuestionDay || 7,
+        session.candidate.missions.find((mission) => mission.day === session!.currentQuestionDay) || { day: 7, title: "Final Evaluation" },
+        getCurriculumDay(session.currentQuestionDay || 7)
+      ),
+    };
   }
 
   // Active question day that candidate is currently answering
@@ -93,8 +112,15 @@ export async function processInterviewTurn(
     session.masteryState.set(activeQuestionDay, updatedMastery);
   }
 
+
+  if (codingSubmission) {
+    const codingEvidence = recordCodingSubmission(session, codingSubmission, Math.max(1, session.turnCount));
+    if (codingEvidence) {
+      session.codingEvidence = [...(session.codingEvidence || []).filter((evidence) => evidence.taskId !== codingEvidence.taskId), codingEvidence].slice(-2);
+    }
+  }
   // 3. Check if interview is finished
-  const isFinished = session.turnCount >= 8 && session.evaluatedDays.size >= 4;
+  const isFinished = session.turnCount >= 8;
 
   if (isFinished || (messageInput && messageInput.toLowerCase().includes("wrap up interview"))) {
     session.done = true;
@@ -126,20 +152,26 @@ export async function processInterviewTurn(
   const turnsOnCurrentDay = session.turnsOnCurrentDay || 1;
 
   if (messageInput) {
-    if ((lastOutcome === "unknown" || lastOutcome === "weak" || lastOutcome === "off_topic") && turnsOnCurrentDay < 2) {
+    const currentTopicAttempts = session.masteryState.get(activeQuestionDay)?.attempts || 1;
+    const staysForDeeperProbe = lastOutcome === "strong" && currentTopicAttempts < 2;
+    const staysForRecovery = ["unknown", "weak", "off_topic", "partial"].includes(lastOutcome || "") && currentTopicAttempts < 4;
+
+    if (staysForDeeperProbe || staysForRecovery) {
       targetDay = session.currentQuestionDay!;
       session.turnsOnCurrentDay = turnsOnCurrentDay + 1;
     } else {
       const candidateFocusDays = session.intelligenceProfile?.recommendedFocusAreas.map((f) => f.day) || [];
       const candidateMissionDays = session.candidate.missions.map((m) => m.day);
-
       const candidateTargetDays = Array.from(new Set([...candidateFocusDays, ...candidateMissionDays]));
-      const unassessedDays = candidateTargetDays.filter((day) => !session!.evaluatedDays.has(day));
+      const unassessedDays = candidateTargetDays.filter((day) => day !== activeQuestionDay && !session!.evaluatedDays.has(day));
+      const alternateDays = candidateTargetDays.filter((day) => day !== activeQuestionDay);
 
       if (unassessedDays.length > 0) {
         targetDay = unassessedDays[0];
+      } else if (alternateDays.length > 0) {
+        targetDay = alternateDays[session.turnCount % alternateDays.length];
       } else {
-        targetDay = candidateTargetDays[session.turnCount % candidateTargetDays.length];
+        targetDay = activeQuestionDay;
       }
 
       session.evaluatedDays.add(targetDay);
@@ -170,15 +202,23 @@ export async function processInterviewTurn(
   // 6. Generate dynamic turn response using Gemini 3.5 Flash Lite
   let reply = "";
   try {
-    reply = await generateTurnWithGemini(session, targetMission, targetCurriculumDay, retrievedMemories);
+    reply = await generateTurnWithGemini(session, targetMission, targetCurriculumDay, retrievedMemories, session.codingEvidence);
   } catch {
     log("error", "gemini.turn_failed", { session: sessionRef(session.sessionId) });
-    if (session.turnCount === 0) {
+    const latestCodingEvidence = session.codingEvidence?.[session.codingEvidence.length - 1];
+    const candidateChallenged = messageInput && /\b(disagree|push back|not sure that|would not use|wouldn't use)\b/i.test(messageInput);
+    if (latestCodingEvidence && codingSubmission) {
+      reply = `Your implementation passed ${latestCodingEvidence.passed} of ${latestCodingEvidence.total} checks. If this ran across a large production corpus, what would you change first?`;
+    } else if (candidateChallenged) {
+      reply = `That's a fair challenge. What evidence or production constraint makes you prefer that approach?`;
+    } else if (session.turnCount === 0) {
       reply = `Thanks for joining, ${displayFirstName(session.candidate)}. Let's start with ${targetCurriculumDay?.title || targetMission.title}. What did you build, and which design decision mattered most?`;
     } else if (lastOutcome === "off_topic") {
       reply = `That's useful context. Bringing it back to ${targetCurriculumDay?.title || targetMission.title}: ${targetCurriculumDay?.objectives?.[0] || "what is the core implementation choice here"}?`;
     } else if (lastOutcome === "unknown" || lastOutcome === "weak") {
       reply = `Let's make that more concrete. In ${targetCurriculumDay?.title || targetMission.title}, how would you explain ${targetCurriculumDay?.objectives?.[0] || "the central idea"} to a teammate implementing it for the first time?`;
+    } else if (lastOutcome === "partial") {
+      reply = `Let's narrow that down. In ${targetCurriculumDay?.title || targetMission.title}, which part of ${targetCurriculumDay?.objectives?.[0] || "the implementation"} would you make explicit?`;
     } else {
       reply = `That gives us a solid base. Let's go one level deeper: ${targetCurriculumDay?.objectives?.[0] || "how did you design this system"}? Which trade-off would you revisit in production?`;
     }
@@ -201,6 +241,23 @@ export async function processInterviewTurn(
   };
 }
 
+
+function recordCodingSubmission(session: InterviewSessionState, submission: CodingSubmission, sourceQuestion: number): CodingEvidence | undefined {
+  const task = getCodingTaskById(submission.taskId);
+  if (!task) return undefined;
+  const evaluation = evaluateCodeSubmission(task, submission.code.slice(0, 24000));
+  return {
+    taskId: task.id,
+    title: task.title,
+    topic: task.topic,
+    language: task.language,
+    passed: evaluation.passed,
+    total: evaluation.total,
+    score: evaluation.score,
+    tests: evaluation.tests.map((test) => ({ name: test.name, passed: test.passed })),
+    sourceQuestion,
+  };
+}
 function buildInterviewIntelligenceState(
   session: InterviewSessionState,
   targetDay: number,
@@ -223,16 +280,20 @@ function buildInterviewIntelligenceState(
 
   let whyThisQuestion = "";
   if (session.turnCount === 0) {
-    const focusReason = session.intelligenceProfile?.recommendedFocusAreas[0]?.reason || "historical cohort signal";
-    whyThisQuestion = `Profile signal: Selected candidate's priority focus area (Day ${targetDay}: ${targetCanonicalTitle}) because ${focusReason}.`;
+    const focusReason = session.intelligenceProfile?.recommendedFocusAreas[0]?.reason || "profile signal";
+    whyThisQuestion = "Profile signal: Selected " + targetCanonicalTitle + " because " + focusReason + ".";
   } else if (lastOutcome === "off_topic") {
-    whyThisQuestion = `Previous answer: Candidate gave an off-topic response. Staying on Day ${targetDay} (${targetCanonicalTitle}) to redirect and evaluate target curriculum objectives.`;
-  } else if (turnsOnCurrentDay > 1 && (lastOutcome === "unknown" || lastOutcome === "weak")) {
-    whyThisQuestion = `Previous answer: Candidate responded with '${lastOutcome}' on Day ${targetDay}. Staying on topic to test foundational prerequisite concepts before moving on.`;
+    whyThisQuestion = "Previous answer was off-topic. Staying with " + targetCanonicalTitle + " to gather direct evidence.";
+  } else if (lastOutcome === "unknown" || lastOutcome === "weak") {
+    whyThisQuestion = "Previous answer showed " + lastOutcome + " understanding. Staying with the topic for a simpler prerequisite probe.";
+  } else if (lastOutcome === "partial") {
+    whyThisQuestion = "Previous answer showed partial understanding. Asking a narrower clarification before moving on.";
+  } else if (lastOutcome === "strong" && turnsOnCurrentDay > 1) {
+    whyThisQuestion = "The candidate demonstrated strong understanding. Moving to the next focus area after a deeper probe.";
   } else if (lastOutcome === "strong") {
-    whyThisQuestion = `Current mastery: Candidate demonstrated strong technical understanding. Advancing to next curriculum focus area (Day ${targetDay}: ${targetCanonicalTitle}).`;
+    whyThisQuestion = "The candidate demonstrated strong understanding. Asking a deeper trade-off or implementation follow-up.";
   } else {
-    whyThisQuestion = `Curriculum objective: Evaluating candidate knowledge on Day ${targetDay} (${targetCanonicalTitle}) based on objective: ${curriculumDay?.objectives?.[0] || "core implementation"}.`;
+    whyThisQuestion = "Evaluating the next useful implementation detail for " + targetCanonicalTitle + ".";
   }
 
   // Canonical mastery scores mapping: always resolve day number to its canonical curriculum title
@@ -260,6 +321,7 @@ function buildInterviewIntelligenceState(
     masteryScores,
     latestEvaluation: session.latestEvaluation,
     whyThisQuestion,
+    codingEvidence: session.codingEvidence || [],
   };
 }
 
@@ -267,7 +329,8 @@ async function generateTurnWithGemini(
   session: InterviewSessionState,
   targetMission: Pick<Mission, "day" | "title">,
   curriculumDay: CurriculumDay | undefined,
-  retrievedMemories?: string[]
+  retrievedMemories?: string[],
+  codingEvidence?: CodingEvidence[]
 ): Promise<string> {
   const candidate = session.candidate;
   const systemInstruction = buildInterviewerSystemPrompt(
@@ -278,7 +341,8 @@ async function generateTurnWithGemini(
     session.lastOutcome,
     session.turnsOnCurrentDay,
     retrievedMemories,
-    session.masteryState.get(targetMission.day)
+    session.masteryState.get(targetMission.day),
+    codingEvidence
   );
 
   // Build message contents for Gemini
@@ -315,7 +379,8 @@ async function generateFeedbackWithGemini(session: InterviewSessionState): Promi
     candidate,
     Array.from(session.evaluatedDays),
     session.intelligenceProfile,
-    evidenceFeedback
+    evidenceFeedback,
+    session.codingEvidence
   );
 
   const conversationSummary = session.history

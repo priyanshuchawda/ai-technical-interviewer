@@ -90,6 +90,22 @@ export interface TopicMastery {
   lastOutcome: ResponseOutcome;
 }
 
+export interface CodingEvidence {
+  taskId: string;
+  title: string;
+  topic: string;
+  language: "python" | "typescript";
+  passed: number;
+  total: number;
+  score: number;
+  tests: Array<{ name: string; passed: boolean }>;
+  sourceQuestion: number;
+}
+
+export interface CodingSubmission {
+  taskId: string;
+  code: string;
+}
 export interface InterviewIntelligenceState {
   currentDay: number;
   currentTopic: string;
@@ -114,6 +130,7 @@ export interface InterviewIntelligenceState {
   latestEvaluation?: AnswerEvaluation;
   whyThisQuestion: string;
   adaptiveDecision?: { label: string; detail: string };
+  codingEvidence?: CodingEvidence[];
 }
 
 export interface InterviewStartRequest {
@@ -124,6 +141,7 @@ export interface InterviewStartRequest {
 export interface InterviewTurnRequest {
   sessionId: string;
   message: string;
+  codingSubmission?: CodingSubmission;
 }
 
 export type InterviewRequest = InterviewStartRequest | InterviewTurnRequest;
@@ -164,4 +182,5 @@ export interface InterviewSessionState {
   masteryState: Map<number, TopicMastery>;
   latestEvaluation?: AnswerEvaluation;
   adaptiveDecision?: { label: string; detail: string };
+  codingEvidence?: CodingEvidence[];
 }

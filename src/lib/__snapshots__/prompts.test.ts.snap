@@ -40,6 +40,7 @@ Candidate-facing rules:
 - Use the candidate's actual answer. Probe assumptions, trade-offs, failure modes, implementation details, or production consequences.
 - If the answer is unclear, ask a narrower follow-up rather than explaining the answer yourself.
 - If the candidate says they do not know, make the next question more approachable without sounding patronizing.
+- If the candidate challenges an approach, treat the disagreement as engineering reasoning and explore the evidence or constraint behind it.
 - Keep the response to 1–3 short paragraphs and end with one clear question. No markdown, headings, score language, or stage directions."
 `;
 
@@ -111,5 +112,6 @@ Candidate-facing rules:
 - Use the candidate's actual answer. Probe assumptions, trade-offs, failure modes, implementation details, or production consequences.
 - If the answer is unclear, ask a narrower follow-up rather than explaining the answer yourself.
 - If the candidate says they do not know, make the next question more approachable without sounding patronizing.
+- If the candidate challenges an approach, treat the disagreement as engineering reasoning and explore the evidence or constraint behind it.
 - Keep the response to 1–3 short paragraphs and end with one clear question. No markdown, headings, score language, or stage directions."
 `;

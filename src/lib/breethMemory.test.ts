@@ -26,7 +26,7 @@ describe("Breeth Graph Memory Integration Tests", () => {
       memories
     );
 
-    expect(prompt).toContain("RETRIEVED BREETH GRAPH MEMORY CONTEXT");
+    expect(prompt).toContain("INTERNAL SESSION MEMORY");
     expect(prompt).toContain("Memory 1: Candidate mentioned using Prometheus metrics");
     expect(prompt).toContain("Memory 2: Candidate previously discussed chunking strategies");
   });

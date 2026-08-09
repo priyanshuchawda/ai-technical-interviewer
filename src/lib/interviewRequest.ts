@@ -29,6 +29,10 @@ export const interviewRequestSchema = z.object({
   sessionId: z.string().min(1).max(128),
   candidate: candidateSchema.optional(),
   message: z.string().max(8000).optional(),
+  codingSubmission: z.object({
+    taskId: z.string().min(1).max(100),
+    code: z.string().max(24000),
+  }).optional(),
 }).strict();
 
 export type InterviewRequest = z.infer<typeof interviewRequestSchema>;

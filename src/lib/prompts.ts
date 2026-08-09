@@ -1,4 +1,4 @@
-import { CandidateProfile, CandidateIntelligenceProfile, CurriculumDay, Mission, ResponseOutcome, TopicMastery, InterviewFeedback } from "../types/interview";
+import { CandidateProfile, CandidateIntelligenceProfile, CurriculumDay, Mission, ResponseOutcome, TopicMastery, InterviewFeedback, CodingEvidence } from "../types/interview";
 import { displayFirstName } from "./pii";
 
 /**
@@ -13,7 +13,8 @@ export function buildInterviewerSystemPrompt(
   lastOutcome?: ResponseOutcome,
   turnsOnCurrentDay?: number,
   retrievedMemories?: string[],
-  masteryContext?: TopicMastery
+  masteryContext?: TopicMastery,
+  codingEvidence?: CodingEvidence[]
 ): string {
   let profileContext = "";
   if (intelligenceProfile) {
@@ -87,13 +88,22 @@ The candidate gave a strong technical response.
 - Probe one meaningful trade-off, failure mode, or production decision, or move to the next focus area.`;
   }
 
+
+  let codingContext = "";
+  if (codingEvidence && codingEvidence.length > 0) {
+    codingContext = `
+=== INTERNAL PRACTICAL EVIDENCE ===
+${codingEvidence.map((evidence) => evidence.title + ": " + evidence.passed + "/" + evidence.total + " checks passed; " + (evidence.tests.filter((test) => test.passed).map((test) => test.name).join(", ") || "no checks passed")).join("\n")}
+Use this to ask a grounded follow-up about the implementation. Never invent code behavior or expose internal scoring.
+`;
+  }
   return `You are a thoughtful senior technical interviewer conducting a live interview for an AI engineering role.
 Candidate: ${displayFirstName(candidate)}
 Role: ${candidate.member.jobRole} (${candidate.member.yearsExperience} years exp)
 
 Missions completed: ${candidate.signals.missionsCompleted}
 Commit days: ${candidate.signals.commitDays}${profileContext}
-${groundingContext}${memoryContext}${masteryStateContext}${adaptiveGuidance}
+${groundingContext}${memoryContext}${masteryStateContext}${codingContext}${adaptiveGuidance}
 
 Candidate-facing rules:
 - The internal context above is private. Never mention days, curriculum, cohorts, scores, mastery, adaptive logic, memories, tools, AI, or being an automated interviewer.
@@ -102,6 +112,7 @@ Candidate-facing rules:
 - Use the candidate's actual answer. Probe assumptions, trade-offs, failure modes, implementation details, or production consequences.
 - If the answer is unclear, ask a narrower follow-up rather than explaining the answer yourself.
 - If the candidate says they do not know, make the next question more approachable without sounding patronizing.
+- If the candidate challenges an approach, treat the disagreement as engineering reasoning and explore the evidence or constraint behind it.
 - Keep the response to 1–3 short paragraphs and end with one clear question. No markdown, headings, score language, or stage directions.`;
 }
 
@@ -112,7 +123,8 @@ export function buildFeedbackSystemPrompt(
   candidate: CandidateProfile,
   evaluatedDays: number[],
   intelligenceProfile?: CandidateIntelligenceProfile,
-  evidenceFeedback?: InterviewFeedback
+  evidenceFeedback?: InterviewFeedback,
+  codingEvidence?: CodingEvidence[]
 ): string {
   let profileContext = "";
   if (intelligenceProfile) {
@@ -134,10 +146,18 @@ ${evidenceFeedback.next.map((nextStep) => `- ${nextStep}`).join("\n")}
 `;
   }
 
+
+  let practicalEvidenceContext = "";
+  if (codingEvidence && codingEvidence.length > 0) {
+    practicalEvidenceContext = `
+Practical implementation evidence:
+${codingEvidence.map((evidence) => "- " + evidence.title + ": " + evidence.passed + "/" + evidence.total + " checks passed").join("\n")}
+`;
+  }
   return `You are a Principal AI Architect evaluating a completed technical interview.
 Candidate: ${displayFirstName(candidate)} (${candidate.member.jobRole})
 Evaluated focus areas: ${evaluatedDays.join(", ")}${profileContext}
-${evidenceContext}
+${evidenceContext}${practicalEvidenceContext}
 
 Instructions:
 - Base the assessment strictly on accumulated live interview evidence.

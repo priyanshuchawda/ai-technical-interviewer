@@ -36,7 +36,7 @@ describe("Interview Intelligence State & UI Payload Tests", () => {
       "I built a vector search pipeline using cosine similarity and FAISS."
     );
     expect(turn2Result.intelligence).toBeDefined();
-    expect(turn2Result.intelligence?.whyThisQuestion).toContain("Current mastery");
+    expect(turn2Result.intelligence?.whyThisQuestion).toContain("strong understanding");
     expect(turn2Result.intelligence?.masteryScores.length).toBeGreaterThan(0);
   }, 25000);
 

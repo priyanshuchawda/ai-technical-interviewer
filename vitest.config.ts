@@ -12,6 +12,11 @@ if (fs.existsSync(".env.local")) {
   }
 }
 
+// Fast tests never inherit live provider credentials from .env.local.
+delete process.env.GEMINI_API_KEY;
+delete process.env.BREETH_API_KEY;
+delete process.env.BREETH_API_URL;
+
 export default defineConfig({
   test: {
     environment: "node",

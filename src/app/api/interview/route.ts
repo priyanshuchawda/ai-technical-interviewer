@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       }, headers);
     }
 
-    const { sessionId, candidate, message } = parsed.data;
+    const { sessionId, candidate, message, codingSubmission } = parsed.data;
     const releaseLock = await tryAcquireSessionLock(sessionId);
     if (!releaseLock) {
       return jsonError(409, "Interview turn already in progress", ErrorCode.TURN_IN_FLIGHT, {}, headers);
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
         hasMessage: Boolean(message),
       });
 
-      const result = await processInterviewTurn(sessionId, candidate, message);
+      const result = await processInterviewTurn(sessionId, candidate, message, codingSubmission);
       recordInterviewTurn(Date.now() - started, true);
       return NextResponse.json(result, { headers });
     } finally {
