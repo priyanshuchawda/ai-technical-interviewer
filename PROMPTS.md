@@ -595,3 +595,30 @@ PRESERVE: All backend behavior, API contracts, candidateProfiler, Breeth integra
 
 GIT: git commit -m "feat: polish interview UI copy and motion"
 ```
+
+## Dark Developer Assessment Workspace Redesign Implementation Prompt
+```
+Redesign the Autonomous Interviewer UI as a dark, high-density professional developer assessment workspace. Use Linear's current information hierarchy and restrained navigation as the primary visual inspiration, Raycast's compact keyboard-oriented interaction model for controls and tabs, and the focused technical-interview experience of Karat as the product UX reference. Do not copy any product's UI.
+
+Use a deep charcoal background, slightly lighter panels, subtle 1px borders, muted secondary text, and one restrained blue accent. No gradients, glassmorphism, glowing borders, neon colors, oversized rounded cards, excessive shadows, decorative AI graphics, or "AI slop" visual language.
+
+Structure the application as a desktop workspace with three regions: a narrow left candidate/interview-plan sidebar, a dominant center interview workspace, and a narrow right assessment/evidence sidebar. Use thin dividers and grouped sections instead of putting every section inside a rounded card.
+
+Add compact top-level tabs: Interview, Evidence, Candidate, Notes. The Interview tab is the default and contains the current question, transcript, response composer and progress. Evidence contains concept mastery, demonstrated/missing concepts and confidence. Candidate contains cohort history and profile signals. Notes contains interviewer notes. Tabs should look like compact desktop application tabs rather than large pill buttons.
+
+Keep the center interview area visually dominant. Present each interviewer question as a clean assessment prompt with curriculum day/topic metadata above it. Candidate responses should appear as understated transcript entries rather than colorful chat bubbles.
+
+Make the right sidebar an Assessment Console. Show current day, topic, mastery, latest signal, evidence coverage, unresolved concepts, next decision, and Breeth memory status. Use concise professional terminology such as "Assessment", "Evidence", "Latest signal", "Next decision", "Coverage", and "Memory". Avoid phrases like "AI Interviewer Agent", "AI Intelligence", "Deep-Dive / Advanced", and other marketing-style AI language.
+
+The interface should feel like software built for engineers evaluating engineers: precise, quiet, dense, functional and trustworthy.
+
+Add subtle motion only: 150–250ms transitions, smooth tab switching, question/response entrance, progress movement and mastery score transitions. Respect prefers-reduced-motion. No flashy animation.
+
+Add keyboard-first interactions: Cmd/Ctrl+Enter to submit, Cmd/Ctrl+1–4 to switch tabs, Escape to cancel/close transient UI.
+
+Preserve all existing interview functionality, API contracts, Breeth integration, adaptive engine, answer evaluation, mastery tracking and feedback generation. This is a visual/interaction redesign, not a rewrite of the assessment engine.
+
+Before finishing, verify the UI at normal 100% browser zoom on a 1440px desktop viewport and ensure the primary interview question and response area remain immediately visible without excessive scrolling.
+
+After implementation, run the full test suite and production build. If both pass, commit the changes with an appropriate conventional commit message and push to https://github.com/priyanshuchawda/autonomous-ai-interviewer.
+```
