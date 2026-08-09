@@ -39,9 +39,9 @@ describe("feedback string contracts", () => {
     const feedback = generateEvidenceBackedFeedback(session);
     expect(feedback.summary).toContain("Sarah");
     expect(feedback.summary).not.toContain("Sarah Johnson");
-    expect(feedback.strengths[0]).toMatch(/^Day 29 \(Monitoring, Logging & Observability\):/);
-    expect(feedback.gaps[0]).toMatch(/^Day 12 \(Prompt Engineering Fundamentals\):/);
-    expect(feedback.next[0]).toMatch(/^Review Day 12 \(Prompt Engineering Fundamentals\)/);
+    expect(feedback.strengths[0]).toMatch(/^Monitoring, Logging & Observability:/);
+    expect(feedback.gaps[0]).toMatch(/^Prompt Engineering Fundamentals:/);
+    expect(feedback.next[0]).toMatch(/^Probe Prompt Engineering Fundamentals/);
     expect(feedback).toMatchSnapshot();
   });
 });

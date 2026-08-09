@@ -7,6 +7,8 @@
 
 An enterprise-grade, stateful, multi-turn AI technical interviewer built with Next.js App Router, TypeScript, Breeth Graph Memory, and Gemini. The agent conducts realistic technical interviews for learners based on their journey through the 31-day AI Cohort curriculum.
 
+**Live demo:** https://interview-cyan-zeta.vercel.app
+
 ## Key features
 
 - **Multi-turn technical evaluation** across curriculum topics

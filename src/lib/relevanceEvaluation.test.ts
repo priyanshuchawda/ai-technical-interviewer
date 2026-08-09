@@ -49,7 +49,7 @@ describe("Relevance-First Answer Evaluation & Off-Topic Prevention Tests", () =>
     expect(turn1Result.intelligence?.currentDay).toBe(29);
     expect(turn1Result.intelligence?.latestEvaluation?.outcome).toBe("off_topic");
     expect(turn1Result.intelligence?.difficultyState).toBe("Redirecting / Off-Topic");
-    expect(turn1Result.intelligence?.whyThisQuestion).toContain("Candidate gave an off-topic response");
+    expect(turn1Result.intelligence?.whyThisQuestion).toContain("Previous answer was off-topic");
   }, 15000);
 
   it("relevant strong logging answer => strong", () => {

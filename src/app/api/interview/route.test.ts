@@ -63,7 +63,7 @@ describe("POST /api/interview", () => {
     const body = await res.json();
     expect(body.reply).toContain("Welcome Sarah");
     expect(body.done).toBe(false);
-    expect(mockedTurn).toHaveBeenCalledWith("s1", candidatesData.candidates[0], undefined);
+    expect(mockedTurn).toHaveBeenCalledWith("s1", candidatesData.candidates[0], undefined, undefined);
   });
 
   it("maps a missing candidate to the documented error", async () => {

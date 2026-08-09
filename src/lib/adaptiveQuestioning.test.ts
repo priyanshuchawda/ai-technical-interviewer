@@ -14,6 +14,9 @@ describe("Profile-Driven Adaptive Questioning Tests", () => {
     expect(classifyResponseOutcome("nope")).toBe("unknown");
     expect(classifyResponseOutcome("maybe")).toBe("weak");
     expect(classifyResponseOutcome("In mission 1, I built a scalable vector search pipeline using cosine similarity and RAG.")).toBe("strong");
+    expect(classifyResponseOutcome("Not sure, but I would probably use Prometheus counters and histograms for latency.")).not.toBe("unknown");
+    expect(classifyResponseOutcome("I have not used Prometheus directly, but I have used Datadog.")).toBe("partial");
+    expect(classifyResponseOutcome("Can you give me an example?")).toBe("partial");
   });
 
   it("should select initial focus area based on candidate intelligence profile", async () => {
@@ -47,13 +50,11 @@ describe("Profile-Driven Adaptive Questioning Tests", () => {
     expect(result.done).toBe(false);
   });
 
-  it("should allow topic progression when candidate gives a strong technical answer", async () => {
+  it("should keep a strong answer on-topic for a deeper probe before progressing", async () => {
     const sessionId = "adaptive-strong-test-" + Date.now();
-    // Turn 0: Init
     await processInterviewTurn(sessionId, sarah);
     const initialDay = (await getSession(sessionId))?.currentQuestionDay;
 
-    // Turn 1: Candidate gives a strong response
     await processInterviewTurn(
       sessionId,
       undefined,
@@ -62,9 +63,13 @@ describe("Profile-Driven Adaptive Questioning Tests", () => {
     const sessionAfterStrong = await getSession(sessionId);
 
     expect(sessionAfterStrong?.lastOutcome).toBe("strong");
-    // Should progress to the next focus day
-    expect(sessionAfterStrong?.currentQuestionDay).not.toBe(initialDay);
-    expect(sessionAfterStrong?.turnsOnCurrentDay).toBe(1);
+    expect(sessionAfterStrong?.currentQuestionDay).toBe(initialDay);
+    expect(sessionAfterStrong?.turnsOnCurrentDay).toBe(2);
+
+    await processInterviewTurn(sessionId, undefined, "We added trace IDs, failure counters, and dashboards for the slowest requests.");
+    const sessionAfterProbe = await getSession(sessionId);
+    expect(sessionAfterProbe?.currentQuestionDay).not.toBe(initialDay);
+    expect(sessionAfterProbe?.turnsOnCurrentDay).toBe(1);
   });
 
   it("should include grounding curriculum day/title/objectives in generated system prompt context", () => {
@@ -73,8 +78,8 @@ describe("Profile-Driven Adaptive Questioning Tests", () => {
 
     const systemPrompt = buildInterviewerSystemPrompt(sarah, targetMission, day29Curriculum, undefined, "unknown", 1);
 
-    expect(systemPrompt).toContain("GROUNDING CURRICULUM CONTEXT");
-    expect(systemPrompt).toContain("Day 29: Monitoring, Logging & Observability");
+    expect(systemPrompt).toContain("INTERNAL TECHNICAL GROUNDING");
+    expect(systemPrompt).toContain("Focus topic: Monitoring, Logging & Observability");
     expect(systemPrompt).toContain("ADAPTIVE GUIDANCE [UNKNOWN ANSWER DETECTED]");
   });
 });

@@ -2,66 +2,50 @@ import { InterviewFeedback, InterviewSessionState, TopicMastery } from "../types
 import { getCurriculumDay } from "./dataService";
 import { displayFirstName } from "./pii";
 
-/**
- * Deterministically generates evidence-backed feedback strictly from live interview evaluation state.
- * Always maps day numbers to canonical curriculum titles via getCurriculumDay(day).
- */
+/** Generates a concise hiring read from live answer and implementation evidence only. */
 export function generateEvidenceBackedFeedback(session: InterviewSessionState): InterviewFeedback {
-  const candidate = session.candidate;
   const masteryEntries: TopicMastery[] = Array.from(session.masteryState.values());
+  const strongTopics = masteryEntries.filter((mastery) => mastery.score >= 0.5 || mastery.lastOutcome === "strong");
+  const weakTopics = masteryEntries.filter((mastery) => mastery.score < 0.5 || ["weak", "unknown", "off_topic"].includes(mastery.lastOutcome));
 
-  const strongTopics = masteryEntries.filter((m) => m.score >= 0.5 || m.lastOutcome === "strong");
-  const weakTopics = masteryEntries.filter((m) => m.score < 0.5 || m.lastOutcome === "weak" || m.lastOutcome === "unknown" || m.lastOutcome === "off_topic");
-
-  // 1. STRENGTHS (Only live demonstrated concepts from interview)
   const strengths: string[] = [];
-  for (const m of strongTopics) {
-    const canonicalTitle = getCurriculumDay(m.day)?.title || m.topic;
-    const conceptsText = m.demonstratedConcepts.length > 0
-      ? m.demonstratedConcepts.join(", ")
-      : "core technical implementation";
-    strengths.push(`Day ${m.day} (${canonicalTitle}): Demonstrated clear understanding of ${conceptsText}.`);
+  for (const mastery of strongTopics) {
+    const topic = getCurriculumDay(mastery.day)?.title || mastery.topic;
+    const concepts = mastery.demonstratedConcepts.slice(0, 3).join(", ") || "core technical implementation";
+    strengths.push(topic + ": Demonstrated clear understanding of " + concepts + ".");
   }
-
-  if (strengths.length === 0) {
-    strengths.push("Insufficient evidence of strong technical concept mastery demonstrated during live interview turns.");
+  for (const evidence of session.codingEvidence || []) {
+    if (evidence.passed === evidence.total) {
+      strengths.push("Practical implementation: " + evidence.title + " passed all " + evidence.total + " deterministic checks.");
+    }
   }
+  if (strengths.length === 0) strengths.push("Limited evidence of strong technical mastery was demonstrated during the live interview.");
 
-  // 2. GAPS (Only live weak/unknown/missing concepts from interview)
   const gaps: string[] = [];
-  for (const m of weakTopics) {
-    const canonicalTitle = getCurriculumDay(m.day)?.title || m.topic;
-    const missingText = m.missingConcepts.length > 0
-      ? m.missingConcepts.slice(0, 3).join(", ")
-      : "foundational principles";
-    gaps.push(`Day ${m.day} (${canonicalTitle}): Struggled with key concepts (${missingText}) during live evaluation.`);
+  for (const mastery of weakTopics) {
+    const topic = getCurriculumDay(mastery.day)?.title || mastery.topic;
+    const missing = mastery.missingConcepts.slice(0, 3).join(", ") || "foundational principles";
+    gaps.push(topic + ": Still unproven in " + missing + ".");
   }
-
-  if (gaps.length === 0) {
-    gaps.push("No major technical gaps observed across evaluated interview modules.");
+  for (const evidence of session.codingEvidence || []) {
+    if (evidence.passed < evidence.total) gaps.push("Practical implementation: " + evidence.title + " passed " + evidence.passed + " of " + evidence.total + " checks.");
   }
+  if (gaps.length === 0) gaps.push("No major technical gaps were observed across the evaluated topics.");
 
-  // 3. NEXT (Actionable recommendations mapped directly to live gaps)
   const next: string[] = [];
-  for (const m of weakTopics) {
-    const curriculumDay = getCurriculumDay(m.day);
-    const canonicalTitle = curriculumDay?.title || m.topic;
-    const keyObjective = curriculumDay?.objectives?.[0] || canonicalTitle;
-    next.push(`Review Day ${m.day} (${canonicalTitle}) curriculum module focusing on ${keyObjective}.`);
+  for (const mastery of weakTopics) {
+    const curriculumDay = getCurriculumDay(mastery.day);
+    const topic = curriculumDay?.title || mastery.topic;
+    const objective = curriculumDay?.objectives?.[0] || topic;
+    next.push("Probe " + topic + " with a concrete scenario covering " + objective + ".");
   }
-
   if (next.length === 0) {
-    next.push("Advance to senior AI system architecture challenges, multi-agent orchestration, and production deployment.");
-    next.push("Practice explaining end-to-end evaluation metrics (Ragas, TruLens) in enterprise environments.");
+    next.push("Continue with a deeper systems-design interview focused on production trade-offs.");
+    next.push("Test end-to-end reliability and evaluation decisions under realistic scale.");
   }
 
-  // 4. SUMMARY (Concise assessment of demonstrated performance)
-  const summary = `${displayFirstName(candidate)} completed a multi-turn technical evaluation covering ${session.evaluatedDays.size} curriculum days. Demonstrated technical proficiency across ${strongTopics.length} topic(s) and identified ${weakTopics.length} area(s) needing further depth.`;
+  const candidateName = displayFirstName(session.candidate);
+  const summary = candidateName + " completed " + session.turnCount + " live technical response(s) across " + session.evaluatedDays.size + " focus area(s). The interview captured " + strongTopics.length + " strong topic signal(s) and " + weakTopics.length + " area(s) for further probing.";
 
-  return {
-    summary,
-    strengths,
-    gaps,
-    next,
-  };
+  return { summary, strengths, gaps, next };
 }

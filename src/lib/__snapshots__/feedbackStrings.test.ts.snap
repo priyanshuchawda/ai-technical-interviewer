@@ -3,14 +3,14 @@
 exports[`feedback string contracts > formats strengths, gaps, and next steps with canonical day titles 1`] = `
 {
   "gaps": [
-    "Day 12 (Prompt Engineering Fundamentals): Struggled with key concepts (few-shot, chain of thought) during live evaluation.",
+    "Prompt Engineering Fundamentals: Still unproven in few-shot, chain of thought.",
   ],
   "next": [
-    "Review Day 12 (Prompt Engineering Fundamentals) curriculum module focusing on Understand zero-shot, few-shot, and chain-of-thought prompting.",
+    "Probe Prompt Engineering Fundamentals with a concrete scenario covering Understand zero-shot, few-shot, and chain-of-thought prompting.",
   ],
   "strengths": [
-    "Day 29 (Monitoring, Logging & Observability): Demonstrated clear understanding of structured logging, token latency.",
+    "Monitoring, Logging & Observability: Demonstrated clear understanding of structured logging, token latency.",
   ],
-  "summary": "Sarah completed a multi-turn technical evaluation covering 2 curriculum days. Demonstrated technical proficiency across 1 topic(s) and identified 1 area(s) needing further depth.",
+  "summary": "Sarah completed 4 live technical response(s) across 2 focus area(s). The interview captured 1 strong topic signal(s) and 1 area(s) for further probing.",
 }
 `;
