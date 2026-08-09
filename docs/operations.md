@@ -34,6 +34,8 @@ Rotate leaked keys immediately. Local files such as `.env.local` stay gitignored
 - Interview turn p95: under 20s when Gemini is healthy
 - Fallback: interview still completes if Gemini/Breeth fail
 
+Live provider checks are optional and run from **Actions → Provider smoke** (`workflow_dispatch`) when `GEMINI_API_KEY` / `BREETH_API_KEY` secrets exist. Default PR CI stays offline.
+
 ## Runbook
 
 1. Check `GET /api/health?ready=1` and recent structured logs (`interview.turn`, `interview.failed`, `auth.denied`, `config.invalid`).

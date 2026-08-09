@@ -1,0 +1,30 @@
+name: Provider smoke
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Offline unit checks still pass
+        run: npm test
+
+      - name: Live provider smoke
+        if: ${{ secrets.GEMINI_API_KEY != '' || secrets.BREETH_API_KEY != '' }}
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          BREETH_API_KEY: ${{ secrets.BREETH_API_KEY }}
+        run: npx vitest run src/lib/geminiClient.test.ts src/lib/breethTimeout.test.ts src/lib/breethMemory.test.ts
