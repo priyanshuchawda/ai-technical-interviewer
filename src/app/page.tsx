@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   CandidateProfile,
   InterviewFeedback,
   InterviewIntelligenceState,
   ResponseOutcome,
 } from "@/types/interview";
+import { generateCandidateProfile } from "@/lib/candidateProfiler";
 import candidatesData from "../../candidates.json";
 
 const candidatesList: CandidateProfile[] = (
@@ -274,6 +275,17 @@ export default function InterviewPage() {
   const currentMastery = intelligence?.masteryScores.find((ms) => ms.day === currentDay);
   const currentMasteryPct = currentMastery ? Math.round(currentMastery.score * 100) : null;
 
+  /**
+   * Candidate-specific recommended focus areas derived from the existing
+   * generateCandidateProfile logic. This is the canonical source — the same
+   * function the backend uses — so pre/post-interview focus areas are always
+   * consistent and candidate-specific. Never falls back to missions.slice().
+   */
+  const profileFocusAreas = useMemo(
+    () => generateCandidateProfile(selectedCandidate).recommendedFocusAreas,
+    [selectedCandidate]
+  );
+
   return (
     <>
       {/* ─── HEADER ─────────────────────────────────────────────────── */}
@@ -338,28 +350,16 @@ export default function InterviewPage() {
                 </span>
               </div>
             </div>
-
-            {!isStarted && (
-              <div className="start-wrap">
-                <button
-                  id="start-interview-btn"
-                  className="btn-start"
-                  onClick={startInterview}
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Initializing…" : "Start Technical Interview"}
-                </button>
-              </div>
-            )}
           </div>
 
-          {/* Assessment plan — show immediately (pre-interview from profile, post-interview from intelligence) */}
-          {(intelligence?.focusAreas?.length ?? 0) > 0 ? (
+          {/* Assessment plan — always uses profileFocusAreas (candidate-specific recommendedFocusAreas)
+               Post-interview: highlights the current active day from intelligence. */}
+          {profileFocusAreas.length > 0 && (
             <div className="panel">
               <div className="ps">
                 <span className="eyebrow">Assessment Focus</span>
                 <div className="plan-list">
-                  {intelligence!.focusAreas.slice(0, 5).map((fa, i) => {
+                  {profileFocusAreas.map((fa, i) => {
                     const isCurrent = isStarted && fa.day === currentDay;
                     return (
                       <div
@@ -378,25 +378,7 @@ export default function InterviewPage() {
                 </div>
               </div>
             </div>
-          ) : !isStarted && selectedCandidate.missions.length > 0 ? (
-            /* pre-interview: show candidate mission list as assessment plan */
-            <div className="panel">
-              <div className="ps">
-                <span className="eyebrow">Assessment Focus</span>
-                <div className="plan-list">
-                  {selectedCandidate.missions.slice(0, 5).map((mis, i) => (
-                    <div key={mis.day} className={`plan-item ${i > 0 ? "passive" : ""}`}>
-                      <span className="plan-num">{String(i + 1).padStart(2, "0")}</span>
-                      <div>
-                        <div className="plan-day">Day {mis.day}</div>
-                        <div className="plan-title">{mis.title}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : null}
+          )}
         </aside>
 
         {/* ── CENTER COLUMN ───────────────────────────────────── */}
@@ -422,19 +404,33 @@ export default function InterviewPage() {
           {/* Conversation / empty */}
           <div className="convo-panel">
             {!isStarted ? (
-              <div className="convo-empty">
-                <div className="empty-icon">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-                    stroke="var(--ink-4)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                  </svg>
+              /* ── Assessment briefing (pre-interview) ── */
+              <div className="briefing">
+                <div className="briefing-label">Technical Interview</div>
+                <div className="briefing-candidate">
+                  {m.name}
+                  <span className="briefing-role">{m.jobRole}</span>
                 </div>
-                <div>
-                  <div className="empty-h">Ready to begin</div>
-                  <div className="empty-p">
-                    Select a candidate above and click <strong>Start Technical Interview</strong> to begin the adaptive assessment.
-                  </div>
+                <p className="briefing-desc">
+                  An 8-question adaptive assessment evaluating your understanding of the
+                  AI Cohort curriculum. Questions are selected based on your cohort history,
+                  completed and skipped missions, and topic mastery.
+                </p>
+                <div className="briefing-meta">
+                  <span>8 questions</span>
+                  <span className="briefing-sep">·</span>
+                  <span>4+ curriculum areas</span>
+                  <span className="briefing-sep">·</span>
+                  <span>Live adaptive assessment</span>
                 </div>
+                <button
+                  id="start-interview-btn"
+                  className="btn-start-main"
+                  onClick={startInterview}
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Initializing…" : "Start Technical Interview →"}
+                </button>
               </div>
             ) : (
               <div className="transcript" ref={transcriptRef}>
@@ -539,13 +535,36 @@ export default function InterviewPage() {
           <div className="panel intel-col">
 
             {!isStarted ? (
-              <div className="ps">
-                <span className="eyebrow">Interview Intelligence</span>
-                <p className="intel-ph">
-                  Live assessment signals, adaptive state, topic mastery and Breeth memory context
-                  will appear here once the interview begins.
-                </p>
-              </div>
+              /* ── Assessment Profile (pre-interview right panel) ── */
+              <>
+                <div className="ps">
+                  <span className="eyebrow">Assessment Profile</span>
+                  <div style={{ fontSize: 12, color: "var(--ink-3)", lineHeight: 1.5, marginBottom: 10 }}>
+                    Priority focus areas derived from {m.name}&apos;s cohort history.
+                  </div>
+                  <div className="plan-list">
+                    {profileFocusAreas.map((fa, i) => (
+                      <div key={fa.day} className={`plan-item ${i > 0 ? "passive" : ""}`}>
+                        <span className="plan-num">{String(i + 1).padStart(2, "0")}</span>
+                        <div>
+                          <div className="plan-day">Day {fa.day}</div>
+                          <div className="plan-title">{fa.title}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="divider" />
+                <div className="ps">
+                  <span className="eyebrow">Adaptive Assessment</span>
+                  <div className="cand-stats" style={{ gap: 5 }}>
+                    <span>8 questions · 4+ curriculum areas</span>
+                    <span>Profile-driven question selection</span>
+                    <span>Live mastery tracking</span>
+                    <span>Breeth Graph Memory context</span>
+                  </div>
+                </div>
+              </>
             ) : !intelligence ? null : (
               <>
                 {/* Current focus */}

@@ -531,3 +531,35 @@ ALL BACKEND STATE PRESERVED: POST /api/interview, sessionId, candidate selection
 
 GIT: git commit -m "feat: refine interview workspace UI" and push.
 ```
+
+## Pre-Interview Focus Area Regression Fix Prompt
+```
+The latest UI redesign introduced a regression. For Sarah Johnson, the pre-interview UI
+displayed Day 7, Day 8, Day 10, Day 12, Day 16 (raw mission list order) instead of her
+actual recommendedFocusAreas: Day 29, Day 12, Day 28, Day 7.
+
+ROOT CAUSE: The pre-interview fallback used selectedCandidate.missions.slice(0, 5)
+instead of generateCandidateProfile().recommendedFocusAreas.
+
+FIX:
+1. Import generateCandidateProfile from @/lib/candidateProfiler in page.tsx.
+2. Compute profileFocusAreas via useMemo from selectedCandidate.
+3. Use profileFocusAreas everywhere (left panel + right panel pre-interview).
+4. Post-interview: highlight the current active day from intelligence.currentDay.
+5. Remove the missions.slice(0,5) fallback entirely.
+
+ADDITIONAL IMPROVEMENTS (same commit):
+- Replace empty center placeholder with a proper assessment briefing: candidate
+  name, role, description, meta, and a prominent Start CTA button.
+- Right panel pre-interview: Assessment Profile showing profileFocusAreas with
+  numbered priority list + Adaptive Assessment description (no fake data).
+
+DATA INTEGRITY: Never hardcode candidate names or day numbers. profileFocusAreas
+derives entirely from generateCandidateProfile which is the same function the
+backend uses. Changing the selected candidate immediately updates focus areas.
+
+DO NOT CHANGE: candidateProfiler.ts, interviewEngine.ts, POST /api/interview,
+Breeth, mastery, curriculum mapping, final feedback, off-topic handling.
+
+GIT: git commit -m "fix: restore personalized assessment focus UI"
+```
