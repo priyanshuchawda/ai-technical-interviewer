@@ -547,7 +547,20 @@ export default function InterviewPage() {
                   rows={4}
                 />
                 <div className="composer-footer">
-                  <span className="kbd-hint">⌘/Ctrl Enter to submit</span>
+                  <div className="composer-tools">
+                    <button
+                      type="button"
+                      className={"voice-button " + voiceState}
+                      onClick={toggleVoiceInput}
+                      disabled={isLoading}
+                      aria-label={voiceLabel}
+                    >
+                      <span className="voice-icon" aria-hidden="true">●</span>
+                      <span>{voiceLabel}</span>
+                      {voiceState === "recording" && <span>{recordingSeconds}s</span>}
+                    </button>
+                    <span className="kbd-hint">⌘/Ctrl Enter to submit</span>
+                  </div>
                   {isLoading ? (
                     <button id="cancel-response-btn" className="btn-submit cancel" onClick={cancelRequest}>
                       Cancel
