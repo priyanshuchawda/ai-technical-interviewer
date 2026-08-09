@@ -101,7 +101,7 @@ export async function processInterviewTurn(
     const feedback = await generateFeedbackWithGemini(session);
     session.feedback = feedback;
 
-    const endReply = `Thank you for completing the technical interview, ${displayFirstName(session.candidate)}. We have thoroughly evaluated your responses across the AI Cohort curriculum modules and generated your detailed assessment feedback.`;
+    const endReply = `Thanks for the thoughtful discussion, ${displayFirstName(session.candidate)}. That completes the interview, and the evidence from your responses has been captured for review.`;
 
     session.history.push({ role: "interviewer", content: endReply });
     await saveSession(session);
@@ -174,13 +174,13 @@ export async function processInterviewTurn(
   } catch {
     log("error", "gemini.turn_failed", { session: sessionRef(session.sessionId) });
     if (session.turnCount === 0) {
-      reply = `Welcome ${displayFirstName(session.candidate)} (${session.candidate.member.jobRole}). Let's start your technical evaluation! On Day ${targetMission.day} you tackled "${targetCurriculumDay?.title || targetMission.title}". Could you explain your implementation and core architectural choices?`;
+      reply = `Thanks for joining, ${displayFirstName(session.candidate)}. Let's start with ${targetCurriculumDay?.title || targetMission.title}. What did you build, and which design decision mattered most?`;
     } else if (lastOutcome === "off_topic") {
-      reply = `That's an interesting technical point, but let's stay focused on Day ${targetMission.day} (${targetCurriculumDay?.title || targetMission.title}). Could you address ${targetCurriculumDay?.objectives?.[0] || "this module's core requirement"}?`;
+      reply = `That's useful context. Bringing it back to ${targetCurriculumDay?.title || targetMission.title}: ${targetCurriculumDay?.objectives?.[0] || "what is the core implementation choice here"}?`;
     } else if (lastOutcome === "unknown" || lastOutcome === "weak") {
-      reply = `Let's break down Day ${targetMission.day} (${targetCurriculumDay?.title || targetMission.title}) step by step. What is the fundamental concept behind ${targetCurriculumDay?.objectives?.[0] || "this topic"}?`;
+      reply = `Let's make that more concrete. In ${targetCurriculumDay?.title || targetMission.title}, how would you explain ${targetCurriculumDay?.objectives?.[0] || "the central idea"} to a teammate implementing it for the first time?`;
     } else {
-      reply = `Great points. Moving to Day ${targetMission.day} (${targetCurriculumDay?.title || targetMission.title}): ${targetCurriculumDay?.objectives?.[0] || "How did you design this system module?"} What key technical trade-offs did you navigate?`;
+      reply = `That gives us a solid base. Let's go one level deeper: ${targetCurriculumDay?.objectives?.[0] || "how did you design this system"}? Which trade-off would you revisit in production?`;
     }
   }
 
@@ -294,12 +294,12 @@ async function generateTurnWithGemini(
   if (contents.length === 0) {
     contents.push({
       role: "user",
-      parts: [{ text: `Start technical interview for candidate ${displayFirstName(candidate)}. Focus first on Day ${targetMission.day} (${curriculumDay?.title || targetMission.title}).` }],
+      parts: [{ text: `Start the technical interview for ${displayFirstName(candidate)}. Focus on ${curriculumDay?.title || targetMission.title}.` }],
     });
   } else if (contents[contents.length - 1].role === "model") {
     contents.push({
       role: "user",
-      parts: [{ text: `Please ask the next interview question for Day ${targetMission.day} (${curriculumDay?.title || targetMission.title}).` }],
+      parts: [{ text: `Please ask the next interview question about ${curriculumDay?.title || targetMission.title}.` }],
     });
   }
 
@@ -341,3 +341,4 @@ async function generateFeedbackWithGemini(session: InterviewSessionState): Promi
 
   return evidenceFeedback;
 }
+

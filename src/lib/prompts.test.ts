@@ -18,8 +18,9 @@ describe("interviewer prompts", () => {
     );
     expect(prompt).toContain("Candidate: Sarah");
     expect(prompt).not.toContain("Sarah Johnson");
-    expect(prompt).toContain("GROUNDING CURRICULUM CONTEXT");
-    expect(prompt).toContain("Day 29");
+    expect(prompt).toContain("INTERNAL TECHNICAL GROUNDING");
+    expect(prompt).toContain("Focus topic: Monitoring, Logging & Observability");
+    expect(prompt).toContain("Never mention days, curriculum, cohorts, scores, mastery, adaptive logic, memories, tools, AI");
     expect(prompt).toContain("Monitoring, Logging & Observability");
     expect(prompt).toMatchSnapshot();
   });
@@ -33,8 +34,8 @@ describe("interviewer prompts", () => {
       "off_topic"
     );
     expect(prompt).toContain("OFF-TOPIC ANSWER DETECTED");
-    expect(prompt).toContain("DO NOT pivot");
-    expect(prompt).toContain("redirect them directly back to Day 29");
+    expect(prompt).toContain("Do not pivot");
+    expect(prompt).toContain("redirect naturally to the focus topic");
     expect(prompt).toMatchSnapshot();
   });
 
@@ -53,7 +54,7 @@ describe("interviewer prompts", () => {
     expect(prompt).toContain("Candidate: Sarah");
     expect(prompt).not.toContain("Sarah Johnson");
     expect(prompt).toContain("ACCUMULATED LIVE INTERVIEW EVIDENCE");
-    expect(prompt).toContain("Do NOT treat historical skipped");
+    expect(prompt).toContain("Do not treat historical skipped");
     expect(prompt).toMatchSnapshot();
   });
 });
