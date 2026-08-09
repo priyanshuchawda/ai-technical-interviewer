@@ -1,4 +1,5 @@
 import { CandidateProfile, CandidateIntelligenceProfile, CurriculumDay, Mission, ResponseOutcome, TopicMastery, InterviewFeedback } from "../types/interview";
+import { displayFirstName } from "./pii";
 
 /**
  * System prompt template for conducting dynamic multi-turn technical interviews.
@@ -86,9 +87,8 @@ The candidate gave a strong technical response.
   }
 
   return `You are an elite AI Technical Interviewer conducting a multi-turn evaluation for a candidate entering an AI engineering role.
-Candidate Name: ${candidate.member.name}
+Candidate: ${displayFirstName(candidate)}
 Role: ${candidate.member.jobRole} (${candidate.member.yearsExperience} years exp)
-Education: ${candidate.member.education}
 
 Missions Completed: ${candidate.signals.missionsCompleted}
 Commit Days: ${candidate.signals.commitDays}${profileContext}
@@ -131,7 +131,7 @@ ${evidenceFeedback.next.map((n) => `- ${n}`).join("\n")}
   }
 
   return `You are a Principal AI Architect evaluating a completed technical interview.
-Candidate: ${candidate.member.name} (${candidate.member.jobRole})
+Candidate: ${displayFirstName(candidate)} (${candidate.member.jobRole})
 Evaluated Days: ${evaluatedDays.join(", ")}${profileContext}
 ${evidenceContext}
 

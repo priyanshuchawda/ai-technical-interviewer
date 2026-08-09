@@ -7,13 +7,11 @@ import { generateCandidateProfile } from "./candidateProfiler";
 import { classifyResponseOutcome } from "./responseClassifier";
 import { evaluateAnswer, updateTopicMastery } from "./answerEvaluator";
 import { generateEvidenceBackedFeedback } from "./feedbackGenerator";
+import { getSession, saveSession } from "./sessionStore";
+import { displayFirstName } from "./pii";
+import { log, sessionRef } from "./logger";
 
-// Global session state cache (In-memory for active API sessions)
-const sessions = new Map<string, InterviewSessionState>();
-
-export function getSession(sessionId: string): InterviewSessionState | undefined {
-  return sessions.get(sessionId);
-}
+export { getSession } from "./sessionStore";
 
 export function createSession(sessionId: string, candidate: CandidateProfile): InterviewSessionState {
   const intelligenceProfile = generateCandidateProfile(candidate);
@@ -33,7 +31,7 @@ export function createSession(sessionId: string, candidate: CandidateProfile): I
     intelligenceProfile,
     masteryState: new Map<number, TopicMastery>(),
   };
-  sessions.set(sessionId, state);
+  saveSession(state);
   return state;
 }
 
@@ -73,7 +71,7 @@ export async function processInterviewTurn(
 
     // Stream to Breeth memory graph asynchronously (Preserve Breeth integration)
     breethClient.addEpisode([
-      { role: "user", content: `[Candidate ${session.candidate.member.name}] ${messageInput}` }
+      { role: "user", content: `[Candidate ${session.candidate.member.id}] ${messageInput}` }
     ]).catch(() => {});
 
     // Evaluate the answer against active curriculum day and update mastery state BEFORE changing targetDay
@@ -98,7 +96,7 @@ export async function processInterviewTurn(
     const feedback = await generateFeedbackWithGemini(session);
     session.feedback = feedback;
 
-    const endReply = `Thank you for completing the technical interview, ${session.candidate.member.name}. We have thoroughly evaluated your responses across the AI Cohort curriculum modules and generated your detailed assessment feedback.`;
+    const endReply = `Thank you for completing the technical interview, ${displayFirstName(session.candidate)}. We have thoroughly evaluated your responses across the AI Cohort curriculum modules and generated your detailed assessment feedback.`;
 
     session.history.push({ role: "interviewer", content: endReply });
     
@@ -157,8 +155,8 @@ export async function processInterviewTurn(
     try {
       const searchQuery = `${targetCurriculumDay?.title || targetMission.title} ${messageInput}`;
       retrievedMemories = await breethClient.searchMemory(searchQuery, 3);
-    } catch (err) {
-      console.warn("[Breeth Memory Retrieval Warning]: Continuing without memory augmentation", err);
+    } catch {
+      log("warn", "breeth.search_failed", { session: sessionRef(session.sessionId) });
       retrievedMemories = [];
     }
   }
@@ -167,10 +165,10 @@ export async function processInterviewTurn(
   let reply = "";
   try {
     reply = await generateTurnWithGemini(session, targetMission, targetCurriculumDay, retrievedMemories);
-  } catch (err) {
-    console.error("[Gemini AI Generation Error, falling back to static prompt]:", err);
+  } catch {
+    log("error", "gemini.turn_failed", { session: sessionRef(session.sessionId) });
     if (session.turnCount === 0) {
-      reply = `Welcome ${session.candidate.member.name} (${session.candidate.member.jobRole}). Let's start your technical evaluation! On Day ${targetMission.day} you tackled "${targetCurriculumDay?.title || targetMission.title}". Could you explain your implementation and core architectural choices?`;
+      reply = `Welcome ${displayFirstName(session.candidate)} (${session.candidate.member.jobRole}). Let's start your technical evaluation! On Day ${targetMission.day} you tackled "${targetCurriculumDay?.title || targetMission.title}". Could you explain your implementation and core architectural choices?`;
     } else if (lastOutcome === "off_topic") {
       reply = `That's an interesting technical point, but let's stay focused on Day ${targetMission.day} (${targetCurriculumDay?.title || targetMission.title}). Could you address ${targetCurriculumDay?.objectives?.[0] || "this module's core requirement"}?`;
     } else if (lastOutcome === "unknown" || lastOutcome === "weak") {
@@ -289,7 +287,7 @@ async function generateTurnWithGemini(
   if (contents.length === 0) {
     contents.push({
       role: "user",
-      parts: [{ text: `Start technical interview for candidate ${candidate.member.name}. Focus first on Day ${targetMission.day} (${curriculumDay?.title || targetMission.title}).` }],
+      parts: [{ text: `Start technical interview for candidate ${displayFirstName(candidate)}. Focus first on Day ${targetMission.day} (${curriculumDay?.title || targetMission.title}).` }],
     });
   } else if (contents[contents.length - 1].role === "model") {
     contents.push({
@@ -314,7 +312,7 @@ async function generateFeedbackWithGemini(session: InterviewSessionState): Promi
   );
 
   const conversationSummary = session.history
-    .map((h) => `${h.role === "candidate" ? candidate.member.name : "Interviewer"}: ${h.content}`)
+    .map((h) => `${h.role === "candidate" ? displayFirstName(candidate) : "Interviewer"}: ${h.content}`)
     .join("\n");
 
   const contents: GeminiMessage[] = [
@@ -330,8 +328,8 @@ async function generateFeedbackWithGemini(session: InterviewSessionState): Promi
     if (parsed.summary && Array.isArray(parsed.strengths) && Array.isArray(parsed.gaps) && Array.isArray(parsed.next)) {
       return parsed as InterviewFeedback;
     }
-  } catch (err) {
-    console.error("[Gemini Feedback Generation Error, using evidence-backed fallback]:", err);
+  } catch {
+    log("error", "gemini.feedback_failed", { session: sessionRef(session.sessionId) });
   }
 
   return evidenceFeedback;

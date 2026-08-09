@@ -1,3 +1,10 @@
+import { log } from "./logger";
+
+export function getSearchTimeoutMs(): number {
+  const raw = Number(process.env.BREETH_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : 8000;
+}
+
 export class BreethClient {
   private getApiKey(): string {
     return process.env.BREETH_API_KEY || "";
@@ -21,8 +28,8 @@ export class BreethClient {
         body: JSON.stringify({ messages }),
       });
       return res.ok;
-    } catch (err) {
-      console.error("[BreethClient] Best-effort episode add failed:", err instanceof Error ? err.message : err);
+    } catch {
+      log("warn", "breeth.episode_failed");
       return false;
     }
   }
@@ -32,7 +39,7 @@ export class BreethClient {
     if (!apiKey || !query.trim()) return [];
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500); // 2.5s best-effort timeout
+    const timeoutId = setTimeout(() => controller.abort(), getSearchTimeoutMs());
 
     try {
       const res = await fetch(`${this.getBaseUrl()}/v1/search`, {
@@ -64,9 +71,9 @@ export class BreethClient {
         if (typeof record.summary === "string") return record.summary;
         return JSON.stringify(item);
       }).filter((text) => text.trim().length > 0);
-    } catch (err) {
+    } catch {
       clearTimeout(timeoutId);
-      console.warn("[BreethClient] Best-effort memory search skipped:", err instanceof Error ? err.message : err);
+      log("warn", "breeth.search_skipped");
       return [];
     }
   }

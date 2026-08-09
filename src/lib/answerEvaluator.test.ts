@@ -24,6 +24,13 @@ describe("Structured Answer Evaluation Tests", () => {
     expect(evaluation.missingConcepts.length).toBeGreaterThan(0);
   });
 
+  it("should not award strong mastery for very short answers", () => {
+    const evaluation = evaluateAnswer("vector db", day10Curriculum);
+    expect(evaluation.outcome).toBe("weak");
+    expect(evaluation.score).toBeLessThan(0.3);
+    expect(evaluation.evidence).toContain("too short");
+  });
+
   it("should not award mastery for unknown answers", () => {
     const evaluation = evaluateAnswer("I don't know", day10Curriculum);
     expect(evaluation.outcome).toBe("unknown");
