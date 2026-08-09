@@ -77,7 +77,7 @@ export async function processInterviewTurn(
     ]).catch(() => {});
 
     // Evaluate the answer against active curriculum day and update mastery state BEFORE changing targetDay
-    const evaluation = evaluateAnswer(messageInput, activeCurriculumDay, session.lastOutcome);
+    const evaluation = evaluateAnswer(messageInput, activeCurriculumDay);
     session.latestEvaluation = evaluation;
 
     const existingMastery = session.masteryState.get(activeQuestionDay);
