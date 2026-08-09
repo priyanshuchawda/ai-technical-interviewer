@@ -17,7 +17,11 @@ export async function generateGeminiContent(
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-  const requestBody: any = {
+  const requestBody: {
+    contents: GeminiMessage[];
+    generationConfig: { responseMimeType?: string };
+    systemInstruction?: { parts: Array<{ text: string }> };
+  } = {
     contents,
     generationConfig: {}
   };

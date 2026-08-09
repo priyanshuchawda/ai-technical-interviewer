@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
+import { readFileSync } from "fs";
+import path from "path";
 import { buildInterviewerSystemPrompt } from "./prompts";
 import { breethClient } from "./breethClient";
 import { processInterviewTurn } from "./interviewEngine";
@@ -47,10 +49,11 @@ describe("Breeth Graph Memory Integration Tests", () => {
     searchSpy.mockRestore();
   });
 
-  it("should ensure no Breeth API credentials are hardcoded or exposed in client code", async () => {
-    const breethApiKeyInEnv = process.env.BREETH_API_KEY;
-    // Check that breethClient does not expose raw apiKey property directly
-    expect((breethClient as any).apiKey).toBeUndefined();
-    expect(breethApiKeyInEnv).toBeDefined();
+  it("should ensure no Breeth API credentials are hardcoded or exposed in client code", () => {
+    expect(Object.prototype.hasOwnProperty.call(breethClient, "apiKey")).toBe(false);
+
+    const clientSource = readFileSync(path.join(__dirname, "breethClient.ts"), "utf8");
+    expect(clientSource).toMatch(/process\.env\.BREETH_API_KEY/);
+    expect(clientSource).not.toMatch(/ck_live_[A-Za-z0-9_]+/);
   });
 });

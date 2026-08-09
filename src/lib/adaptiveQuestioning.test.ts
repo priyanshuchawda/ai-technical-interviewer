@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { processInterviewTurn, getSession, createSession } from "./interviewEngine";
+import { processInterviewTurn, getSession } from "./interviewEngine";
 import { classifyResponseOutcome } from "./responseClassifier";
 import { buildInterviewerSystemPrompt } from "./prompts";
 import candidatesData from "../../candidates.json";

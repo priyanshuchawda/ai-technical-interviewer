@@ -3,6 +3,7 @@ import { getCurriculumDay } from "./dataService";
 import { generateCandidateProfile } from "./candidateProfiler";
 import { processInterviewTurn, getSession } from "./interviewEngine";
 import { generateEvidenceBackedFeedback } from "./feedbackGenerator";
+import { InterviewSessionState } from "../types/interview";
 import candidatesData from "../../candidates.json";
 
 describe("Canonical Curriculum Day Mapping & State Integrity Tests", () => {
@@ -103,14 +104,18 @@ describe("Canonical Curriculum Day Mapping & State Integrity Tests", () => {
   }, 25000);
 
   it("should preserve canonical day numbers and titles in final feedback recommendations", () => {
-    const session = getSession("nonexistent-session") || {
+    const session: InterviewSessionState = getSession("nonexistent-session") || {
+      sessionId: "canonical-feedback-test",
       candidate: sarah,
+      turnCount: 2,
       evaluatedDays: new Set([29, 12, 28, 7]),
+      history: [],
+      done: false,
       masteryState: new Map([
         [29, { day: 29, topic: "Monitoring, Logging & Observability", score: 0.2, attempts: 1, demonstratedConcepts: [], missingConcepts: ["structured logging"], lastOutcome: "weak" }],
         [12, { day: 12, topic: "Prompt Engineering Fundamentals", score: 0.8, attempts: 1, demonstratedConcepts: ["few-shot"], missingConcepts: [], lastOutcome: "strong" }],
       ]),
-    } as any;
+    };
 
     const feedback = generateEvidenceBackedFeedback(session);
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { classifyResponseOutcome } from "./responseClassifier";
 import { evaluateAnswer } from "./answerEvaluator";
-import { processInterviewTurn, getSession } from "./interviewEngine";
+import { processInterviewTurn } from "./interviewEngine";
 import { getCurriculumDay } from "./dataService";
 import candidatesData from "../../candidates.json";
 

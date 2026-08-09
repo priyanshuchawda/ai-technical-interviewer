@@ -1,4 +1,4 @@
-import { AnswerEvaluation, CurriculumDay, ResponseOutcome } from "../types/interview";
+import { AnswerEvaluation, CurriculumDay } from "../types/interview";
 import { classifyResponseOutcome } from "./responseClassifier";
 
 /**
@@ -7,8 +7,7 @@ import { classifyResponseOutcome } from "./responseClassifier";
  */
 export function evaluateAnswer(
   answer: string,
-  curriculumDay: CurriculumDay | undefined,
-  previousOutcome?: ResponseOutcome
+  curriculumDay: CurriculumDay | undefined
 ): AnswerEvaluation {
   const outcome = classifyResponseOutcome(answer, curriculumDay);
   const lowerAnswer = answer.toLowerCase().trim();

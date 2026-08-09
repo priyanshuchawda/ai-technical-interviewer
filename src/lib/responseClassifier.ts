@@ -1,5 +1,5 @@
 import { ResponseOutcome, CurriculumDay } from "../types/interview";
-import curriculumData from "../../curriculum.json";
+import { curriculum } from "./dataService";
 
 const UNKNOWN_PATTERNS = [
   "i don't know",
@@ -65,7 +65,7 @@ function getDayKeywords(day?: CurriculumDay): Set<string> {
 // Helper: extract technical keywords for all OTHER curriculum days
 function getOtherDaysKeywords(currentDayNumber?: number): Set<string> {
   const set = new Set<string>();
-  const allDays = (curriculumData as any).days as CurriculumDay[];
+  const allDays = curriculum.days;
 
   for (const day of allDays) {
     if (day.day === currentDayNumber) continue;

@@ -1,4 +1,4 @@
-import { CandidateProfile, InterviewFeedback, InterviewSessionState, ResponseOutcome, TopicMastery, InterviewIntelligenceState } from "../types/interview";
+import { CandidateProfile, CurriculumDay, InterviewFeedback, InterviewSessionState, Mission, ResponseOutcome, TopicMastery, InterviewIntelligenceState } from "../types/interview";
 import { getCurriculumDay } from "./dataService";
 import { breethClient } from "./breethClient";
 import { generateGeminiContent, GeminiMessage } from "./geminiClient";
@@ -77,7 +77,7 @@ export async function processInterviewTurn(
     ]).catch(() => {});
 
     // Evaluate the answer against active curriculum day and update mastery state BEFORE changing targetDay
-    const evaluation = evaluateAnswer(messageInput, activeCurriculumDay, session.lastOutcome);
+    const evaluation = evaluateAnswer(messageInput, activeCurriculumDay);
     session.latestEvaluation = evaluation;
 
     const existingMastery = session.masteryState.get(activeQuestionDay);
@@ -199,8 +199,8 @@ export async function processInterviewTurn(
 function buildInterviewIntelligenceState(
   session: InterviewSessionState,
   targetDay: number,
-  targetMission: any,
-  curriculumDay: any
+  targetMission: Pick<Mission, "day" | "title">,
+  curriculumDay: CurriculumDay | undefined
 ): InterviewIntelligenceState {
   const turnsOnCurrentDay = session.turnsOnCurrentDay || 1;
   const lastOutcome = session.lastOutcome;
@@ -260,8 +260,8 @@ function buildInterviewIntelligenceState(
 
 async function generateTurnWithGemini(
   session: InterviewSessionState,
-  targetMission: any,
-  curriculumDay: any,
+  targetMission: Pick<Mission, "day" | "title">,
+  curriculumDay: CurriculumDay | undefined,
   retrievedMemories?: string[]
 ): Promise<string> {
   const candidate = session.candidate;

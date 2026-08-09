@@ -7,7 +7,6 @@ import candidatesData from "../../candidates.json";
 describe("Structured Answer Evaluation Tests", () => {
   const sarah = candidatesData.candidates[0];
   const day10Curriculum = getCurriculumDay(10);
-  const day29Curriculum = getCurriculumDay(29);
 
   it("should produce demonstrated concepts for a strong answer", () => {
     const answer = "I implemented cosine similarity search with FAISS vector index for fast retrieval.";
