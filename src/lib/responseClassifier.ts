@@ -1,5 +1,6 @@
 import { ResponseOutcome, CurriculumDay } from "../types/interview";
 import { curriculum } from "./dataService";
+import { jaccard } from "./textStats";
 
 const UNKNOWN_PATTERNS = [
   "i don't know",
@@ -107,6 +108,12 @@ export function classifyResponseOutcome(
 
     // If answer contains technical concepts from other topics BUT zero matches with current topic objectives/title/tools
     if (currentHits.length === 0 && otherHits.length > 0) {
+      return "off_topic";
+    }
+
+    const currentJaccard = jaccard(words, currentKeywords);
+    const otherJaccard = jaccard(words, otherKeywords);
+    if (otherJaccard >= 0.08 && currentJaccard < 0.03) {
       return "off_topic";
     }
   }
