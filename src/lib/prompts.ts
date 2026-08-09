@@ -9,7 +9,8 @@ export function buildInterviewerSystemPrompt(
   curriculumDay: CurriculumDay | undefined,
   intelligenceProfile?: CandidateIntelligenceProfile,
   lastOutcome?: ResponseOutcome,
-  turnsOnCurrentDay?: number
+  turnsOnCurrentDay?: number,
+  retrievedMemories?: string[]
 ): string {
   let profileContext = "";
   if (intelligenceProfile) {
@@ -31,6 +32,15 @@ ${curriculumDay?.objectives?.map((o) => `- ${o}`).join("\n") || "- Core technica
 Covered Topics: ${curriculumDay?.topics?.join(", ") || "General AI engineering"}
 Key Tools: ${curriculumDay?.tools?.join(", ") || "Standard tech stack"}
 `;
+
+  let memoryContext = "";
+  if (retrievedMemories && retrievedMemories.length > 0) {
+    memoryContext = `
+=== RETRIEVED BREETH GRAPH MEMORY CONTEXT ===
+${retrievedMemories.map((m, i) => `Memory ${i + 1}: ${m}`).join("\n")}
+(Note: Use these retrieved memories to reference candidate's previously demonstrated knowledge or concepts across turns when relevant.)
+`;
+  }
 
   let adaptiveGuidance = "";
   if (lastOutcome === "unknown") {
@@ -61,7 +71,7 @@ Education: ${candidate.member.education}
 
 Missions Completed: ${candidate.signals.missionsCompleted}
 Commit Days: ${candidate.signals.commitDays}${profileContext}
-${groundingContext}${adaptiveGuidance}
+${groundingContext}${memoryContext}${adaptiveGuidance}
 
 Instructions:
 - Be concise, professional, engaging, and technically rigorous.

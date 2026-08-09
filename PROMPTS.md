@@ -105,3 +105,52 @@ GIT:
 - push to:
   https://github.com/priyanshuchawda/autonomous-ai-interviewer
 ```
+
+## Breeth Graph Memory Integration into Adaptive Decision Loop Implementation Prompt
+```
+Implement the next incremental feature: make Breeth Graph Memory part of the adaptive interview decision loop.
+
+Inspect the existing breethClient.ts and interviewEngine.ts before modifying anything.
+
+Current behavior already sends candidate turns to Breeth using addEpisode(). Keep that behavior.
+
+Add contextual memory retrieval using the existing Breeth searchMemory() helper.
+
+On each candidate turn:
+1. Store the candidate's latest response in Breeth as it already does.
+2. Retrieve a small number of relevant memories using the current interview topic/day and the candidate's latest response as the search context.
+3. Pass only the retrieved memory summaries into the interview decision/generation prompt.
+4. Use the memories to help the interviewer reference demonstrated knowledge from earlier in the interview instead of treating every turn as isolated.
+5. Keep Breeth retrieval best-effort: if the API fails, times out, or returns nothing, the interview must continue normally.
+6. Do not expose Breeth credentials to the client.
+7. Do not change POST /api/interview or the response contract.
+8. Do not redesign the UI.
+9. Do not add a database.
+10. Do not replace the existing candidate profile or adaptive-questioning logic; Breeth should augment it.
+
+Add focused tests for:
+- Breeth memories being included when available
+- interview continuing when Breeth search fails
+- no Breeth credential being exposed in generated client code
+- existing adaptive questioning tests remaining valid
+
+Do not make the system dependent on Breeth for correctness; it should improve contextual awareness rather than become a single point of failure.
+
+VALIDATION:
+- run npm test
+- run npm run build
+- verify Breeth retrieval is actually called during a multi-turn interview
+- verify the interview still works if Breeth is unavailable
+- verify the existing adaptive behavior remains intact
+
+SECURITY:
+- inspect the repository for accidentally committed API credentials
+- ensure Breeth credentials remain server-side/environment-only
+- do not print or expose the credential in logs, tests, prompts, or client bundles
+
+GIT:
+- commit with:
+  feat: use Breeth memory for contextual interviewing
+- push to:
+  https://github.com/priyanshuchawda/autonomous-ai-interviewer
+```

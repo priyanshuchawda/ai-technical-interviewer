@@ -112,17 +112,29 @@ export async function processInterviewTurn(
     }
   }
 
-  // Requirement 3: Include relevant curriculum day/title/objectives as grounding context
+  // Grounding context & target mission
   const targetMission = session.candidate.missions.find((m) => m.day === targetDay) || {
     day: targetDay,
     title: `Day ${targetDay} Curriculum Module`,
   };
   const curriculumDay = getCurriculumDay(targetDay);
 
-  // 5. Generate dynamic turn response using Gemini 3.5 Flash Lite
+  // 5. Best-effort Breeth contextual memory retrieval
+  let retrievedMemories: string[] = [];
+  if (messageInput) {
+    try {
+      const searchQuery = `${targetMission.title} ${messageInput}`;
+      retrievedMemories = await breethClient.searchMemory(searchQuery, 3);
+    } catch (err) {
+      console.warn("[Breeth Memory Retrieval Warning]: Continuing without memory augmentation", err);
+      retrievedMemories = [];
+    }
+  }
+
+  // 6. Generate dynamic turn response using Gemini 3.5 Flash Lite
   let reply = "";
   try {
-    reply = await generateTurnWithGemini(session, targetMission, curriculumDay);
+    reply = await generateTurnWithGemini(session, targetMission, curriculumDay, retrievedMemories);
   } catch (err) {
     console.error("[Gemini AI Generation Error, falling back to static prompt]:", err);
     if (session.turnCount === 0) {
@@ -144,7 +156,8 @@ export async function processInterviewTurn(
 async function generateTurnWithGemini(
   session: InterviewSessionState,
   targetMission: any,
-  curriculumDay: any
+  curriculumDay: any,
+  retrievedMemories?: string[]
 ): Promise<string> {
   const candidate = session.candidate;
   const systemInstruction = buildInterviewerSystemPrompt(
@@ -153,7 +166,8 @@ async function generateTurnWithGemini(
     curriculumDay,
     session.intelligenceProfile,
     session.lastOutcome,
-    session.turnsOnCurrentDay
+    session.turnsOnCurrentDay,
+    retrievedMemories
   );
 
   // Build message contents for Gemini
