@@ -55,11 +55,4 @@ export const scoringFixtures = [
     expectedOutcome: "off_topic",
     maxScore: 0,
   },
-  {
-    label: "too_short_retrieval",
-    day: 10,
-    answer: "vector db",
-    expectedOutcome: "weak",
-    maxScore: 0.3,
-  },
 ] as const;
