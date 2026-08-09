@@ -1,50 +1,58 @@
-# AI Technical Interviewer
+# Autonomous Interviewer
 
 ![Next.js](https://img.shields.io/badge/Next.js-16.3-black?logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?logo=typescript)
 ![CI](https://github.com/priyanshuchawda/ai-technical-interviewer/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-An enterprise-grade, stateful, multi-turn AI technical interviewer built with Next.js App Router, TypeScript, Breeth Graph Memory, and Gemini. The agent conducts realistic technical interviews for learners based on their journey through the 31-day AI Cohort curriculum.
+Technical hiring should reveal how someone thinks — not just how well they answer a list of questions.
 
-**Live demo:** https://interview-cyan-zeta.vercel.app
+Autonomous Interviewer is a multi-turn technical interviewer that follows the candidate’s reasoning, decides when a claim should be tested in code, and turns the conversation into hiring-ready evidence.
 
-## Key features
+**Live app:** [https://ai-technical-interviewer-orpin.vercel.app/](https://ai-technical-interviewer-orpin.vercel.app/)
 
-- **Multi-turn technical evaluation** across curriculum topics
-- **Adaptive questioning** based on completed, skipped, or multi-attempt missions
-- **Breeth Graph Memory** for contextual follow-ups
-- **Structured answer evaluation** with mastery tracking
-- **Evidence-backed feedback** (`summary`, `strengths`, `gaps`, `next`)
-- **Interview intelligence UI** for live assessment state
-- **`POST /api/interview`** matching the technical specification (`sessionId`, `candidate`, `message`, `done`, `feedback`)
+## Product demo
+
+[![Watch the demo](./public/demo/poster.jpg)](https://github.com/priyanshuchawda/ai-technical-interviewer/blob/main/public/demo/autonomous-interviewer-demo.mp4)
+
+[Watch the 1:56 demo with voice-over →](https://github.com/priyanshuchawda/ai-technical-interviewer/blob/main/public/demo/autonomous-interviewer-demo.mp4) · [Captions](./public/demo/autonomous-interviewer-demo.srt)
+
+Sarah Johnson interviews for Senior Data Engineer. The interviewer goes deeper on observability, introduces a focused coding check only when a claim should be tested, then produces an evidence-backed assessment.
+
+## What it does
+
+- **Conversational technical screen** grounded in the 31-day AI Cohort curriculum
+- **Adaptive follow-ups** from the candidate’s last answer, not a fixed script
+- **Opportunistic coding** when a practical claim should be tested in production-style code
+- **Deterministic checks** so implementations become interview evidence, not a throwaway editor
+- **Hiring-ready assessment** with demonstrated topics, gaps, and suggested follow-up
+- **Speech + text input** for a realistic interview flow
+- **`POST /api/interview`** matching the [technical spec](./technical-spec.md)
 
 ## Architecture
 
-- **Framework**: Next.js App Router (React 19)
-- **Language**: TypeScript (strict)
-- **Styling**: vanilla CSS design tokens
-- **Memory**: Breeth Graph API
-- **LLM**: Gemini for dynamic turns and feedback synthesis
-- **Testing**: Vitest unit/component/snapshot tests, golden scoring fixtures, Playwright laptop/mobile e2e, staging smoke
+| Layer | Stack |
+| --- | --- |
+| App | Next.js App Router, React 19, TypeScript (strict) |
+| UI | Design tokens + vanilla CSS |
+| Dialogue | Gemini |
+| Memory | Breeth Graph Memory |
+| Evaluation | Deterministic scoring + evidence aggregation |
+| Tests | Vitest, Playwright laptop/mobile e2e, staging smoke |
 
 ## Getting started
 
-### 1. Install
-
 ```bash
+git clone https://github.com/priyanshuchawda/ai-technical-interviewer.git
+cd ai-technical-interviewer
 npm install
-```
-
-### 2. Configure environment
-
-Copy the example env file:
-
-```bash
 cp .env.example .env.local
+npm run dev
 ```
 
-Then fill in `.env.local`:
+Open [http://localhost:3000](http://localhost:3000).
+
+Fill `.env.local` (never commit real keys):
 
 ```env
 BREETH_API_KEY=""
@@ -53,17 +61,17 @@ GEMINI_API_KEY=""
 GEMINI_MODEL="gemini-3.5-flash-lite"
 ```
 
-Production vars are listed in `.env.example` (`INTERVIEW_API_KEY`, session store, rate limits). Never commit `.env.local` or real API keys.
+Production vars are listed in `.env.example` (`INTERVIEW_API_KEY`, session store, rate limits). See [docs/operations.md](docs/operations.md) for deploy, auth, durable sessions, metrics, and runbook notes.
 
-See [docs/operations.md](docs/operations.md) for deploy, auth, durable sessions, metrics, and runbook notes.
+## API
 
-### 3. Run
-
-```bash
-npm run dev
+```http
+POST /api/interview
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Start with `sessionId` + `candidate`, then send `message` on each turn. When the interview is complete the response includes `done: true` and structured `feedback`.
+
+Details: [technical-spec.md](./technical-spec.md)
 
 ## Verification
 
@@ -74,10 +82,14 @@ STAGING_URL=https://ai-technical-interviewer-orpin.vercel.app npm run test:stagi
 npm run lint
 npm run typecheck
 npm run build
-npx tsx src/scripts/test-api.ts
 ```
 
-The API test expects the dev server to be running.
+## Docs
+
+- [Technical spec](./technical-spec.md)
+- [Operations](./docs/operations.md)
+- [Contributing](./CONTRIBUTING.md)
+- [Prompt log](./PROMPTS.md)
 
 ## License
 

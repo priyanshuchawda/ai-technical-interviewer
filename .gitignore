@@ -51,3 +51,9 @@ next-env.d.ts
 # local secrets (never commit)
 .env.local
 .env
+
+# local recording source assets (shipped demo lives in public/demo)
+/video.mp4
+/Ethan-*.mp3
+/autonomous-interviewer-demo.mp4
+/autonomous-interviewer-demo.srt
