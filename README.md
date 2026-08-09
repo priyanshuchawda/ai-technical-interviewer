@@ -51,7 +51,9 @@ GEMINI_API_KEY=""
 GEMINI_MODEL="gemini-3.5-flash-lite"
 ```
 
-Never commit `.env.local` or real API keys.
+Optional production vars are listed in `.env.example` (`INTERVIEW_API_KEY`, timeouts, rate limits). Never commit `.env.local` or real API keys.
+
+See [docs/operations.md](docs/operations.md) for deploy, secrets, and runbook notes.
 
 ### 3. Run
 
