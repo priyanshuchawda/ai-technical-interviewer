@@ -3,21 +3,23 @@ import { getCurriculumDay } from "./dataService";
 
 /**
  * Deterministically generates evidence-backed feedback strictly from live interview evaluation state.
+ * Always maps day numbers to canonical curriculum titles via getCurriculumDay(day).
  */
 export function generateEvidenceBackedFeedback(session: InterviewSessionState): InterviewFeedback {
   const candidate = session.candidate;
   const masteryEntries: TopicMastery[] = Array.from(session.masteryState.values());
 
   const strongTopics = masteryEntries.filter((m) => m.score >= 0.5 || m.lastOutcome === "strong");
-  const weakTopics = masteryEntries.filter((m) => m.score < 0.5 || m.lastOutcome === "weak" || m.lastOutcome === "unknown");
+  const weakTopics = masteryEntries.filter((m) => m.score < 0.5 || m.lastOutcome === "weak" || m.lastOutcome === "unknown" || m.lastOutcome === "off_topic");
 
   // 1. STRENGTHS (Only live demonstrated concepts from interview)
   const strengths: string[] = [];
   for (const m of strongTopics) {
+    const canonicalTitle = getCurriculumDay(m.day)?.title || m.topic;
     const conceptsText = m.demonstratedConcepts.length > 0
       ? m.demonstratedConcepts.join(", ")
       : "core technical implementation";
-    strengths.push(`Day ${m.day} (${m.topic}): Demonstrated clear understanding of ${conceptsText}.`);
+    strengths.push(`Day ${m.day} (${canonicalTitle}): Demonstrated clear understanding of ${conceptsText}.`);
   }
 
   if (strengths.length === 0) {
@@ -27,10 +29,11 @@ export function generateEvidenceBackedFeedback(session: InterviewSessionState): 
   // 2. GAPS (Only live weak/unknown/missing concepts from interview)
   const gaps: string[] = [];
   for (const m of weakTopics) {
+    const canonicalTitle = getCurriculumDay(m.day)?.title || m.topic;
     const missingText = m.missingConcepts.length > 0
       ? m.missingConcepts.slice(0, 3).join(", ")
       : "foundational principles";
-    gaps.push(`Day ${m.day} (${m.topic}): Struggled with key concepts (${missingText}) during live evaluation.`);
+    gaps.push(`Day ${m.day} (${canonicalTitle}): Struggled with key concepts (${missingText}) during live evaluation.`);
   }
 
   if (gaps.length === 0) {
@@ -41,8 +44,9 @@ export function generateEvidenceBackedFeedback(session: InterviewSessionState): 
   const next: string[] = [];
   for (const m of weakTopics) {
     const curriculumDay = getCurriculumDay(m.day);
-    const keyObjective = curriculumDay?.objectives?.[0] || m.topic;
-    next.push(`Review Day ${m.day} (${m.topic}) curriculum module focusing on ${keyObjective}.`);
+    const canonicalTitle = curriculumDay?.title || m.topic;
+    const keyObjective = curriculumDay?.objectives?.[0] || canonicalTitle;
+    next.push(`Review Day ${m.day} (${canonicalTitle}) curriculum module focusing on ${keyObjective}.`);
   }
 
   if (next.length === 0) {
