@@ -320,3 +320,58 @@ Add focused tests for:
 - existing API contract remaining valid
 - existing tests continuing to pass
 ```
+
+## Relevance-First Answer Evaluation Layer Implementation Prompt
+```
+We found a critical behavioral bug during manual testing.
+
+A candidate was asked a Day 29 structured logging question but answered with an explanation of embeddings. The system incorrectly classified the answer as technically strong and then pivoted to an embeddings/vector-database question.
+
+Fix this before adding any new features.
+
+Inspect the current answerEvaluator.ts, responseClassifier.ts, interviewEngine.ts, prompts.ts, curriculum data, and related tests.
+
+Implement a relevance-first answer evaluation layer.
+
+Requirements:
+
+1. Before awarding technical mastery for a candidate response, determine whether the response actually addresses the current question.
+
+2. Add a structured outcome:
+   - strong
+   - partial
+   - weak
+   - unknown
+   - off_topic
+
+3. An off-topic response must NOT:
+   - increase mastery for the current curriculum topic
+   - be counted as a demonstrated concept for the current question
+   - cause the interviewer to pivot to the unrelated concept mentioned in the answer
+   - be described as a strong technical answer
+
+4. For an off-topic response, the interviewer should remain on the current curriculum topic and politely redirect the candidate.
+
+5. The current question's curriculum day/objectives must be the primary reference for relevance and evaluation.
+
+6. Do not award mastery simply because the candidate mentions a technically valid concept that belongs to another curriculum day.
+
+7. Preserve the existing strong/partial/weak/unknown behavior for answers that are actually relevant to the question.
+
+8. Make the relevance check deterministic where practical. Do not simply rely on keyword overlap.
+
+9. If an answer contains concepts from another curriculum topic but does not answer the current question, classify it as off_topic rather than strong.
+
+10. Update the intelligence payload so the latest evaluation can display "OFF TOPIC" and a concise explanation such as:
+"Response discussed embeddings, but the current question tested structured logging."
+
+11. Keep the historical candidate profile separate from current answer relevance. A candidate can be strong in embeddings while still being off-topic for a logging question.
+
+12. Do not redesign the UI. Make the smallest UI change necessary to represent the new outcome clearly.
+
+13. Do not remove Breeth integration.
+
+14. Do not change POST /api/interview or break the existing sessionId flow.
+
+15. Do not expose chain-of-thought.
+```

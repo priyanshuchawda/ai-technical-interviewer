@@ -52,14 +52,17 @@ export async function processInterviewTurn(
     session = createSession(sessionId, candidateInput);
   }
 
-  // 2. Add incoming candidate message to history if provided & classify response outcome
+  const activeQuestionDay = session.currentQuestionDay || 7;
+  const currentCurriculumDay = getCurriculumDay(activeQuestionDay);
+
+  // 2. Add incoming candidate message to history if provided & classify response outcome against current question day
   let lastOutcome: ResponseOutcome | undefined;
   if (messageInput) {
     session.history.push({ role: "candidate", content: messageInput });
     session.turnCount += 1;
 
-    // Requirement 5: Classify answer into structured outcome (strong, partial, weak, unknown)
-    lastOutcome = classifyResponseOutcome(messageInput);
+    // Classify answer into structured outcome (strong, partial, weak, unknown, off_topic)
+    lastOutcome = classifyResponseOutcome(messageInput, currentCurriculumDay);
     session.lastOutcome = lastOutcome;
 
     // Stream to Breeth memory graph asynchronously (Preserve Breeth integration)
@@ -100,12 +103,12 @@ export async function processInterviewTurn(
   const turnsOnCurrentDay = session.turnsOnCurrentDay || 1;
 
   if (messageInput) {
-    // Requirements 6 & 8: If answer is unknown or weak, stay on current topic to ask simpler prerequisite unless already spent 2 turns
-    if ((lastOutcome === "unknown" || lastOutcome === "weak") && turnsOnCurrentDay < 2) {
+    // Requirements: If answer is unknown, weak, or off_topic, stay on current topic to ask simpler prerequisite unless already spent 2 turns
+    if ((lastOutcome === "unknown" || lastOutcome === "weak" || lastOutcome === "off_topic") && turnsOnCurrentDay < 2) {
       targetDay = session.currentQuestionDay!;
       session.turnsOnCurrentDay = turnsOnCurrentDay + 1;
     } else {
-      // Requirements 2 & 7: Advance to next focus area or unassessed curriculum day
+      // Advance to next focus area or unassessed curriculum day
       const candidateFocusDays = session.intelligenceProfile?.recommendedFocusAreas.map((f) => f.day) || [];
       const candidateMissionDays = session.candidate.missions.map((m) => m.day);
 
@@ -143,19 +146,19 @@ export async function processInterviewTurn(
     }
   }
 
-  // 5.5 Evaluate the answer and update mastery state
+  // 5.5 Evaluate the answer against current curriculum day and update mastery state
   if (messageInput) {
-    const evaluation = evaluateAnswer(messageInput, curriculumDay, session.lastOutcome);
+    const evaluation = evaluateAnswer(messageInput, currentCurriculumDay, session.lastOutcome);
     session.latestEvaluation = evaluation;
 
-    const existingMastery = session.masteryState.get(targetDay);
+    const existingMastery = session.masteryState.get(activeQuestionDay);
     const updatedMastery = updateTopicMastery(
       existingMastery,
       evaluation,
-      targetDay,
-      curriculumDay?.topics?.[0] || targetMission.title
+      activeQuestionDay,
+      currentCurriculumDay?.topics?.[0] || targetMission.title
     );
-    session.masteryState.set(targetDay, updatedMastery);
+    session.masteryState.set(activeQuestionDay, updatedMastery);
   }
 
   // 6. Generate dynamic turn response using Gemini 3.5 Flash Lite
@@ -166,6 +169,8 @@ export async function processInterviewTurn(
     console.error("[Gemini AI Generation Error, falling back to static prompt]:", err);
     if (session.turnCount === 0) {
       reply = `Welcome ${session.candidate.member.name} (${session.candidate.member.jobRole}). Let's start your technical evaluation! On Day ${targetMission.day} you tackled "${targetMission.title}". Could you explain your implementation and core architectural choices?`;
+    } else if (lastOutcome === "off_topic") {
+      reply = `That's an interesting technical point, but let's stay focused on Day ${targetMission.day} (${targetMission.title}). Could you address ${curriculumDay?.objectives?.[0] || "this module's core requirement"}?`;
     } else if (lastOutcome === "unknown" || lastOutcome === "weak") {
       reply = `Let's break down Day ${targetMission.day} (${targetMission.title}) step by step. What is the fundamental concept behind ${curriculumDay?.objectives?.[0] || "this topic"}?`;
     } else {
@@ -199,7 +204,9 @@ function buildInterviewIntelligenceState(
   const lastOutcome = session.lastOutcome;
 
   let difficultyState = "Standard Adaptive Assessment";
-  if (turnsOnCurrentDay > 1 && (lastOutcome === "unknown" || lastOutcome === "weak")) {
+  if (lastOutcome === "off_topic") {
+    difficultyState = "Redirecting / Off-Topic";
+  } else if (turnsOnCurrentDay > 1 && (lastOutcome === "unknown" || lastOutcome === "weak")) {
     difficultyState = "Prerequisite Recovery";
   } else if (lastOutcome === "strong") {
     difficultyState = "Deep-Dive / Advanced";
@@ -209,6 +216,8 @@ function buildInterviewIntelligenceState(
   if (session.turnCount === 0) {
     const focusReason = session.intelligenceProfile?.recommendedFocusAreas[0]?.reason || "historical cohort signal";
     whyThisQuestion = `Profile signal: Selected candidate's priority focus area (Day ${targetDay}: ${targetMission.title}) because ${focusReason}.`;
+  } else if (lastOutcome === "off_topic") {
+    whyThisQuestion = `Previous answer: Candidate gave an off-topic response. Staying on Day ${targetDay} (${targetMission.title}) to redirect and evaluate target curriculum objectives.`;
   } else if (turnsOnCurrentDay > 1 && (lastOutcome === "unknown" || lastOutcome === "weak")) {
     whyThisQuestion = `Previous answer: Candidate responded with '${lastOutcome}' on Day ${targetDay}. Staying on topic to test foundational prerequisite concepts before moving on.`;
   } else if (lastOutcome === "strong") {

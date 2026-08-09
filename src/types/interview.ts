@@ -42,7 +42,7 @@ export interface CandidateIntelligenceProfile {
   }>;
 }
 
-export type ResponseOutcome = "strong" | "partial" | "weak" | "unknown";
+export type ResponseOutcome = "strong" | "partial" | "weak" | "unknown" | "off_topic";
 
 export interface CurriculumDay {
   day: number;

@@ -57,7 +57,14 @@ Last Outcome: ${masteryContext.lastOutcome}
   }
 
   let adaptiveGuidance = "";
-  if (lastOutcome === "unknown") {
+  if (lastOutcome === "off_topic") {
+    adaptiveGuidance = `
+ADAPTIVE GUIDANCE [OFF-TOPIC ANSWER DETECTED]:
+The candidate gave an off-topic answer discussing an unrelated concept instead of answering the question about Day ${targetMission.day} ("${targetMission.title}").
+- DO NOT pivot to the unrelated concept mentioned by the candidate.
+- Acknowledge their comment politely (e.g. "That's correct about that concept, but it doesn't address our question on ${targetMission.title}..."), but redirect them directly back to Day ${targetMission.day} ("${targetMission.title}").
+- Ask a clearer, simpler question directly grounded in the curriculum objective: "${curriculumDay?.objectives?.[0] || targetMission.title}".`;
+  } else if (lastOutcome === "unknown") {
     adaptiveGuidance = `
 ADAPTIVE GUIDANCE [UNKNOWN ANSWER DETECTED]:
 The candidate previously responded with "I don't know" or an equivalent unknown response.
