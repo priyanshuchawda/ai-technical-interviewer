@@ -99,7 +99,19 @@ export interface CodingEvidence {
   total: number;
   score: number;
   tests: Array<{ name: string; passed: boolean }>;
+  demonstratedConcepts?: string[];
+  missingConcepts?: string[];
   sourceQuestion: number;
+}
+
+export interface CodingOpportunity {
+  taskId: string;
+  title: string;
+  topic: string;
+  language: "python" | "javascript" | "typescript";
+  whyThisTask: string;
+  functionSignature: string;
+  estimatedMinutes: number;
 }
 
 export interface CodingSubmission {
@@ -131,6 +143,8 @@ export interface InterviewIntelligenceState {
   whyThisQuestion: string;
   adaptiveDecision?: { label: string; detail: string };
   codingEvidence?: CodingEvidence[];
+  codingOpportunity?: CodingOpportunity;
+  codingAssessmentsCompleted?: number;
 }
 
 export interface InterviewStartRequest {
@@ -183,4 +197,6 @@ export interface InterviewSessionState {
   latestEvaluation?: AnswerEvaluation;
   adaptiveDecision?: { label: string; detail: string };
   codingEvidence?: CodingEvidence[];
+  codingOpportunity?: CodingOpportunity;
+  codingAssessmentsCompleted?: number;
 }

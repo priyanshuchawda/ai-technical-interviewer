@@ -1,4 +1,4 @@
-import { CandidateProfile, CurriculumDay, InterviewFeedback, InterviewSessionState, Mission, ResponseOutcome, TopicMastery, InterviewIntelligenceState, CodingEvidence, CodingSubmission } from "../types/interview";
+import { CandidateProfile, CurriculumDay, InterviewFeedback, InterviewSessionState, Mission, ResponseOutcome, TopicMastery, InterviewIntelligenceState, CodingEvidence, CodingSubmission, CodingOpportunity } from "../types/interview";
 import { getCurriculumDay } from "./dataService";
 import { breethClient } from "./breethClient";
 import { generateGeminiContent, GeminiMessage } from "./geminiClient";
@@ -13,7 +13,7 @@ import { log, sessionRef } from "./logger";
 import { detectPromptInjection, wrapUntrustedAnswer } from "./promptGuard";
 import { compactHistory } from "./historyCompact";
 import { interviewFeedbackSchema } from "./feedbackSchema";
-import { evaluateCodeSubmission, getCodingTaskById } from "./codingTasks";
+import { evaluateCodeSubmission, getCodingTaskById, getOpportunisticCodingTask, CodeTask } from "./codingTasks";
 
 export { getSession } from "./sessionStore";
 
@@ -35,6 +35,7 @@ export async function createSession(sessionId: string, candidate: CandidateProfi
     intelligenceProfile,
     masteryState: new Map<number, TopicMastery>(),
     codingEvidence: [],
+    codingAssessmentsCompleted: 0,
   };
   await saveSession(state);
   return state;
@@ -67,7 +68,6 @@ export async function processInterviewTurn(
         session,
         session.currentQuestionDay || 7,
         session.candidate.missions.find((mission) => mission.day === session!.currentQuestionDay) || { day: 7, title: "Final Evaluation" },
-        getCurriculumDay(session.currentQuestionDay || 7)
       ),
     };
   }
@@ -110,6 +110,16 @@ export async function processInterviewTurn(
       activeCanonicalTitle
     );
     session.masteryState.set(activeQuestionDay, updatedMastery);
+
+    if (!session.codingOpportunity) {
+      const opportunityTask = getOpportunisticCodingTask(
+        activeCanonicalTitle,
+        lastOutcome,
+        evaluation.demonstratedConcepts,
+        session.codingAssessmentsCompleted || 0
+      );
+      if (opportunityTask) session.codingOpportunity = toCodingOpportunity(opportunityTask);
+    }
   }
 
 
@@ -117,6 +127,8 @@ export async function processInterviewTurn(
     const codingEvidence = recordCodingSubmission(session, codingSubmission, Math.max(1, session.turnCount));
     if (codingEvidence) {
       session.codingEvidence = [...(session.codingEvidence || []).filter((evidence) => evidence.taskId !== codingEvidence.taskId), codingEvidence].slice(-2);
+      session.codingAssessmentsCompleted = (session.codingAssessmentsCompleted || 0) + 1;
+      session.codingOpportunity = undefined;
     }
   }
   // 3. Check if interview is finished
@@ -136,7 +148,6 @@ export async function processInterviewTurn(
       session,
       session.currentQuestionDay || 7,
       session.candidate.missions.find((m) => m.day === session!.currentQuestionDay) || { day: 7, title: "Final Evaluation" },
-      getCurriculumDay(session.currentQuestionDay || 7)
     );
 
     return {
@@ -202,13 +213,15 @@ export async function processInterviewTurn(
   // 6. Generate dynamic turn response using Gemini 3.5 Flash Lite
   let reply = "";
   try {
-    reply = await generateTurnWithGemini(session, targetMission, targetCurriculumDay, retrievedMemories, session.codingEvidence);
+    reply = await generateTurnWithGemini(session, targetMission, targetCurriculumDay, retrievedMemories, session.codingEvidence, session.codingOpportunity);
   } catch {
     log("error", "gemini.turn_failed", { session: sessionRef(session.sessionId) });
     const latestCodingEvidence = session.codingEvidence?.[session.codingEvidence.length - 1];
     const candidateChallenged = messageInput && /\b(disagree|push back|not sure that|would not use|wouldn't use)\b/i.test(messageInput);
     if (latestCodingEvidence && codingSubmission) {
       reply = `Your implementation passed ${latestCodingEvidence.passed} of ${latestCodingEvidence.total} checks. If this ran across a large production corpus, what would you change first?`;
+    } else if (session.codingOpportunity && lastOutcome === "strong") {
+      reply = `That is a good approach. Let's make that concrete for a moment. Can you implement the small ${session.codingOpportunity.title.toLowerCase()} check before we continue?`;
     } else if (candidateChallenged) {
       reply = `That's a fair challenge. What evidence or production constraint makes you prefer that approach?`;
     } else if (session.turnCount === 0) {
@@ -231,7 +244,6 @@ export async function processInterviewTurn(
     session,
     targetDay,
     targetMission,
-    targetCurriculumDay
   );
 
   return {
@@ -241,6 +253,18 @@ export async function processInterviewTurn(
   };
 }
 
+
+function toCodingOpportunity(task: CodeTask): CodingOpportunity {
+  return {
+    taskId: task.id,
+    title: task.title,
+    topic: task.topic,
+    language: task.language,
+    whyThisTask: task.whyThisTask,
+    functionSignature: task.functionSignature,
+    estimatedMinutes: task.estimatedMinutes,
+  };
+}
 
 function recordCodingSubmission(session: InterviewSessionState, submission: CodingSubmission, sourceQuestion: number): CodingEvidence | undefined {
   const task = getCodingTaskById(submission.taskId);
@@ -255,6 +279,8 @@ function recordCodingSubmission(session: InterviewSessionState, submission: Codi
     total: evaluation.total,
     score: evaluation.score,
     tests: evaluation.tests.map((test) => ({ name: test.name, passed: test.passed })),
+    demonstratedConcepts: evaluation.tests.filter((test) => test.passed).map((test) => test.name),
+    missingConcepts: evaluation.tests.filter((test) => !test.passed).map((test) => test.name),
     sourceQuestion,
   };
 }
@@ -262,7 +288,6 @@ function buildInterviewIntelligenceState(
   session: InterviewSessionState,
   targetDay: number,
   targetMission: Pick<Mission, "day" | "title">,
-  curriculumDay: CurriculumDay | undefined
 ): InterviewIntelligenceState {
   const turnsOnCurrentDay = session.turnsOnCurrentDay || 1;
   const lastOutcome = session.lastOutcome;
@@ -322,6 +347,8 @@ function buildInterviewIntelligenceState(
     latestEvaluation: session.latestEvaluation,
     whyThisQuestion,
     codingEvidence: session.codingEvidence || [],
+    codingOpportunity: session.codingOpportunity,
+    codingAssessmentsCompleted: session.codingAssessmentsCompleted || 0,
   };
 }
 
@@ -330,7 +357,8 @@ async function generateTurnWithGemini(
   targetMission: Pick<Mission, "day" | "title">,
   curriculumDay: CurriculumDay | undefined,
   retrievedMemories?: string[],
-  codingEvidence?: CodingEvidence[]
+  codingEvidence?: CodingEvidence[],
+  codingOpportunity?: CodingOpportunity
 ): Promise<string> {
   const candidate = session.candidate;
   const systemInstruction = buildInterviewerSystemPrompt(
@@ -342,7 +370,8 @@ async function generateTurnWithGemini(
     session.turnsOnCurrentDay,
     retrievedMemories,
     session.masteryState.get(targetMission.day),
-    codingEvidence
+    codingEvidence,
+    codingOpportunity
   );
 
   // Build message contents for Gemini
