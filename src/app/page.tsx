@@ -153,6 +153,7 @@ export default function InterviewPage() {
   const sendTurn = async () => {
     if (!inputMessage.trim() || isLoading || isDone) return;
     const text = inputMessage;
+    setRequestError("");
     setInputMessage("");
     setMessages((p) => [...p, { role: "candidate", content: text }]);
     setIsLoading(true);
@@ -356,6 +357,8 @@ export default function InterviewPage() {
               </div>
             )}
 
+            {requestError ? <p className="start-subtext">{requestError}</p> : null}
+
             {isLoading && (
               <div className="loading-indicator">
                 <div className="ldots">
@@ -383,7 +386,7 @@ export default function InterviewPage() {
                   rows={4}
                 />
                 <div className="composer-footer">
-                  <span className="kbd-hint">⌘ Enter to submit</span>
+                  <span className="kbd-hint">⌘/Ctrl Enter to submit</span>
                   {isLoading ? (
                     <button
                       id="cancel-response-btn"
