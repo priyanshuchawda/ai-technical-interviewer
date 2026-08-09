@@ -317,7 +317,6 @@ export default function InterviewPage() {
 
           <nav className="studio-nav" aria-label="Interview sections">
             <button className="studio-nav-item active" type="button">Interview</button>
-            
           </nav>
           <div className="hdr-right">
             {isStarted && !isDone && (
