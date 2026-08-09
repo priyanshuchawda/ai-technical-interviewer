@@ -112,6 +112,7 @@ export default function InterviewPage() {
   const [inputMessage, setInputMessage] = useState("");
   const [isStarted, setIsStarted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [requestError, setRequestError] = useState("");
   const [assessmentPhase, setAssessmentPhase] = useState<"idle" | "evaluating" | "assessed">("idle");
   const [isDone, setIsDone] = useState(false);
   const [feedback, setFeedback] = useState<InterviewFeedback | null>(null);
@@ -129,6 +130,7 @@ export default function InterviewPage() {
   const transcriptRef = useRef("");
 
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const requestControllerRef = useRef<AbortController | null>(null);
 
   // Keyboard listener: Cmd/Ctrl+Enter, Esc
   useEffect(() => {
@@ -144,6 +146,10 @@ export default function InterviewPage() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isDrawerOpen]);
+
+  useEffect(() => {
+    void fetch("/api/csrf").catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     const storedTheme = window.localStorage.getItem("interview-theme") as Theme | null;
@@ -162,6 +168,7 @@ export default function InterviewPage() {
     return () => window.clearInterval(timer);
   }, [voiceState]);
   const startInterview = async () => {
+    setRequestError("");
     setIsLoading(true);
     const sid = `session-${Date.now()}`;
     setSessionId(sid);
@@ -176,14 +183,17 @@ export default function InterviewPage() {
         setMessages([{ role: "interviewer", content: data.reply }]);
         if (data.intelligence) setIntelligence(data.intelligence);
         setIsStarted(true);
+      } else {
+        setRequestError(data.error || data.message || "Could not start the interview. Retry in a moment.");
       }
     } catch (err) {
-      console.error(err);
+      if (!(err instanceof DOMException && err.name === "AbortError")) {
+        setRequestError("Could not start the interview. Retry in a moment.");
+      }
     } finally {
       setIsLoading(false);
     }
   };
-
   const toggleVoiceInput = () => {
     if (voiceState === "recording") {
       setVoiceState("processing");
@@ -234,6 +244,13 @@ export default function InterviewPage() {
     setInputMessage("I also completed the optional coding check for " + codingTask.title + ": " + evaluation.passed + " of " + evaluation.total + " checks passed.");
     setCodingMode(false);
   };
+  const cancelRequest = () => {
+    requestControllerRef.current?.abort();
+    requestControllerRef.current = null;
+    setIsLoading(false);
+    setAssessmentPhase("idle");
+  };
+
   const sendTurn = async () => {
     if (!inputMessage.trim() || isLoading || isDone) return;
     const text = inputMessage;
@@ -241,11 +258,14 @@ export default function InterviewPage() {
     setMessages((p) => [...p, { role: "candidate", content: text }]);
     setIsLoading(true);
     setAssessmentPhase("evaluating");
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
     try {
       const res = await fetch("/api/interview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId, message: text }),
+        signal: controller.signal,
       });
       const data = await res.json();
       if (res.ok) {
@@ -259,12 +279,14 @@ export default function InterviewPage() {
         }
       }
     } catch (err) {
-      console.error(err);
+      if (!(err instanceof DOMException && err.name === "AbortError")) {
+        console.error(err);
+      }
     } finally {
+      if (requestControllerRef.current === controller) requestControllerRef.current = null;
       setIsLoading(false);
     }
   };
-
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
@@ -332,6 +354,7 @@ export default function InterviewPage() {
               <span className="csel-label">Candidate</span>
               <select
                 id="candidate-selector"
+                aria-label="Candidate"
                 className="csel"
                 disabled={isStarted}
                 value={m.id}
@@ -372,8 +395,7 @@ export default function InterviewPage() {
               <div className="start-cand-name">{m.name}</div>
               <div className="start-cand-role">{m.jobRole}</div>
               <div className="start-cand-meta">
-                <span>08 questions</span>
-                <span>Adaptive assessment</span>
+                <span>8 questions · Adaptive technical assessment</span>
               </div>
             </div>
             <div className="start-details">
@@ -392,6 +414,7 @@ export default function InterviewPage() {
                 </div>
               ))}
               </div>
+            {requestError && <div className="request-error" role="alert">{requestError}</div>}
             <button
               id="start-interview-btn"
               className="btn-start-main"
@@ -525,14 +548,20 @@ export default function InterviewPage() {
                 />
                 <div className="composer-footer">
                   <span className="kbd-hint">⌘ Enter to submit</span>
-                  <button
-                    id="submit-response-btn"
-                    className="btn-submit"
-                    onClick={sendTurn}
-                    disabled={isLoading || !inputMessage.trim()}
-                  >
-                    {isLoading ? "Evaluating…" : "Submit →"}
-                  </button>
+                  {isLoading ? (
+                    <button id="cancel-response-btn" className="btn-submit cancel" onClick={cancelRequest}>
+                      Cancel
+                    </button>
+                  ) : (
+                    <button
+                      id="submit-response-btn"
+                      className="btn-submit"
+                      onClick={sendTurn}
+                      disabled={!inputMessage.trim()}
+                    >
+                      Submit →
+                    </button>
+                  )}
                 </div>
               </div>
             )}
