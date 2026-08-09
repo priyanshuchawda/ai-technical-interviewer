@@ -6,8 +6,8 @@ import candidatesData from "../../candidates.json";
 describe("Evidence-Backed Final Interview Feedback Tests", () => {
   const sarah = candidatesData.candidates[0];
 
-  it("should contain all four required conceptual fields in feedback", () => {
-    const session = createSession("feedback-fields-test", sarah);
+  it("should contain all four required conceptual fields in feedback", async () => {
+    const session = await createSession("feedback-fields-test", sarah);
     const feedback = generateEvidenceBackedFeedback(session);
 
     expect(feedback).toHaveProperty("summary");
@@ -32,7 +32,7 @@ describe("Evidence-Backed Final Interview Feedback Tests", () => {
       "I implemented cosine similarity search with FAISS vector index for fast retrieval and matching."
     );
 
-    const session = createSession(sessionId, sarah);
+    const session = await createSession(sessionId, sarah);
     // Simulate mastery entry for Day 10
     session.masteryState.set(10, {
       day: 10,
@@ -52,7 +52,7 @@ describe("Evidence-Backed Final Interview Feedback Tests", () => {
   it("should generate gaps from live weak/unknown answers and NOT automatically treat historical high-attempt data as a gap", async () => {
     const sessionId = "feedback-gaps-test-" + Date.now();
 
-    const session = createSession(sessionId, sarah);
+    const session = await createSession(sessionId, sarah);
     // Sarah historically had 4 attempts on Day 12 (Prompt Engineering).
     // But during the live interview, she gives a strong answer on Day 12.
     session.masteryState.set(12, {
@@ -86,7 +86,7 @@ describe("Evidence-Backed Final Interview Feedback Tests", () => {
 
   it("should map next steps directly to identified live curriculum gaps", async () => {
     const sessionId = "feedback-next-test-" + Date.now();
-    const session = createSession(sessionId, sarah);
+    const session = await createSession(sessionId, sarah);
 
     session.masteryState.set(29, {
       day: 29,

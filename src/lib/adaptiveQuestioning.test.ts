@@ -20,7 +20,7 @@ describe("Profile-Driven Adaptive Questioning Tests", () => {
     const sessionId = "adaptive-init-test-" + Date.now();
     const result = await processInterviewTurn(sessionId, sarah);
 
-    const session = getSession(sessionId);
+    const session = await getSession(sessionId);
     expect(session).toBeDefined();
     expect(session?.intelligenceProfile).toBeDefined();
 
@@ -34,11 +34,11 @@ describe("Profile-Driven Adaptive Questioning Tests", () => {
     const sessionId = "adaptive-unknown-test-" + Date.now();
     // Turn 0: Init
     await processInterviewTurn(sessionId, sarah);
-    const initialDay = getSession(sessionId)?.currentQuestionDay;
+    const initialDay = (await getSession(sessionId))?.currentQuestionDay;
 
     // Turn 1: Candidate says "I don't know"
     const result = await processInterviewTurn(sessionId, undefined, "I don't know");
-    const sessionAfterUnknown = getSession(sessionId);
+    const sessionAfterUnknown = await getSession(sessionId);
 
     // Current day MUST remain on the same day (Day 29), and lastOutcome must be "unknown"
     expect(sessionAfterUnknown?.lastOutcome).toBe("unknown");
@@ -51,7 +51,7 @@ describe("Profile-Driven Adaptive Questioning Tests", () => {
     const sessionId = "adaptive-strong-test-" + Date.now();
     // Turn 0: Init
     await processInterviewTurn(sessionId, sarah);
-    const initialDay = getSession(sessionId)?.currentQuestionDay;
+    const initialDay = (await getSession(sessionId))?.currentQuestionDay;
 
     // Turn 1: Candidate gives a strong response
     await processInterviewTurn(
@@ -59,7 +59,7 @@ describe("Profile-Driven Adaptive Questioning Tests", () => {
       undefined,
       "In our production environment, we implemented structured Prometheus metrics and OpenTelemetry logs for vector index latency."
     );
-    const sessionAfterStrong = getSession(sessionId);
+    const sessionAfterStrong = await getSession(sessionId);
 
     expect(sessionAfterStrong?.lastOutcome).toBe("strong");
     // Should progress to the next focus day

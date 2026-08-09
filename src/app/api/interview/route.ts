@@ -3,13 +3,16 @@ import { processInterviewTurn } from "@/lib/interviewEngine";
 import { interviewRequestSchema } from "@/lib/interviewRequest";
 import { isAuthorized } from "@/lib/apiAuth";
 import { getClientIp, rateLimit } from "@/lib/rateLimit";
-import { log, sessionRef } from "@/lib/logger";
+import { ipRef, log, sessionRef } from "@/lib/logger";
 import { tryAcquireSessionLock } from "@/lib/sessionLock";
 import { ErrorCode } from "@/lib/errorCodes";
-
-const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES || 64 * 1024);
-const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX || 60);
-const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS || 60_000);
+import { getMaxBodyBytes, getRateLimitMax, getRateLimitWindowMs, isDeployMisconfigured } from "@/lib/config";
+import {
+  recordInterviewTurn,
+  recordMisconfigured,
+  recordRateLimited,
+  recordUnauthorized,
+} from "@/lib/metrics";
 
 function jsonError(
   status: number,
@@ -24,14 +27,26 @@ function jsonError(
 export async function POST(req: NextRequest) {
   const requestId = crypto.randomUUID();
   const headers = { "x-request-id": requestId };
+  const started = Date.now();
+  const client = ipRef(getClientIp(req));
 
   try {
+    if (isDeployMisconfigured()) {
+      recordMisconfigured();
+      log("error", "config.invalid", { requestId });
+      return jsonError(503, "Server misconfigured", ErrorCode.MISCONFIGURED, {}, headers);
+    }
+
     if (!isAuthorized(req)) {
+      recordUnauthorized();
+      log("warn", "auth.denied", { requestId, client });
       return jsonError(401, "Unauthorized", ErrorCode.UNAUTHORIZED, {}, headers);
     }
 
-    const limited = rateLimit(getClientIp(req), RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+    const limited = await rateLimit(getClientIp(req), getRateLimitMax(), getRateLimitWindowMs());
     if (!limited.ok) {
+      recordRateLimited();
+      log("warn", "interview.rate_limited", { requestId, client });
       return jsonError(
         429,
         "Too many requests",
@@ -45,7 +60,7 @@ export async function POST(req: NextRequest) {
     }
 
     const contentLength = Number(req.headers.get("content-length") || "0");
-    if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
+    if (Number.isFinite(contentLength) && contentLength > getMaxBodyBytes()) {
       return jsonError(413, "Request body too large", ErrorCode.PAYLOAD_TOO_LARGE, {}, headers);
     }
 
@@ -67,7 +82,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { sessionId, candidate, message } = parsed.data;
-    const releaseLock = tryAcquireSessionLock(sessionId);
+    const releaseLock = await tryAcquireSessionLock(sessionId);
     if (!releaseLock) {
       return jsonError(409, "Interview turn already in progress", ErrorCode.TURN_IN_FLIGHT, {}, headers);
     }
@@ -76,20 +91,23 @@ export async function POST(req: NextRequest) {
       log("info", "interview.turn", {
         requestId,
         session: sessionRef(sessionId),
+        client,
         hasCandidate: Boolean(candidate),
         hasMessage: Boolean(message),
       });
 
       const result = await processInterviewTurn(sessionId, candidate, message);
+      recordInterviewTurn(Date.now() - started, true);
       return NextResponse.json(result, { headers });
     } finally {
-      releaseLock();
+      await releaseLock();
     }
   } catch (error: unknown) {
     const known = error instanceof Error ? error.message : "";
     if (known.includes("Candidate profile is required")) {
       return jsonError(400, "Candidate profile is required to start an interview", ErrorCode.CANDIDATE_REQUIRED, {}, headers);
     }
+    recordInterviewTurn(Date.now() - started, false);
     log("error", "interview.failed", { requestId, reason: known.slice(0, 180) });
     return jsonError(500, "Internal server error", ErrorCode.INTERNAL, {}, headers);
   }

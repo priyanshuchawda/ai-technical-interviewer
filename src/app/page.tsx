@@ -90,12 +90,18 @@ export default function InterviewPage() {
   const [isDone, setIsDone] = useState(false);
   const [feedback, setFeedback] = useState<InterviewFeedback | null>(null);
   const [intelligence, setIntelligence] = useState<InterviewIntelligenceState | null>(null);
+  const [requestError, setRequestError] = useState("");
 
   // Drawer state for progressive disclosure
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const csrfReady = useRef<Promise<void> | null>(null);
+
+  useEffect(() => {
+    csrfReady.current = fetch("/api/csrf", { credentials: "same-origin" }).then(() => undefined);
+  }, []);
 
   // Keyboard listener: Cmd/Ctrl+Enter, Esc
   useEffect(() => {
@@ -114,14 +120,17 @@ export default function InterviewPage() {
 
   const startInterview = async () => {
     setIsLoading(true);
+    setRequestError("");
     abortRef.current?.abort();
     const sid = crypto.randomUUID();
     setSessionId(sid);
     abortRef.current = new AbortController();
     try {
+      await csrfReady.current;
       const res = await fetch("/api/interview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ sessionId: sid, candidate: selectedCandidate }),
         signal: abortRef.current.signal,
       });
@@ -130,9 +139,12 @@ export default function InterviewPage() {
         setMessages([{ role: "interviewer", content: data.reply }]);
         if (data.intelligence) setIntelligence(data.intelligence);
         setIsStarted(true);
+      } else {
+        setRequestError(data.error || `Request failed (${res.status})`);
       }
     } catch (err) {
       console.error(err);
+      setRequestError("Could not start the interview. Retry in a moment.");
     } finally {
       setIsLoading(false);
     }
@@ -147,9 +159,11 @@ export default function InterviewPage() {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
     try {
+      await csrfReady.current;
       const res = await fetch("/api/interview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ sessionId, message: text }),
         signal: abortRef.current.signal,
       });
@@ -161,9 +175,12 @@ export default function InterviewPage() {
           setIsDone(true);
           if (data.feedback) setFeedback(data.feedback);
         }
+      } else {
+        setRequestError(data.error || `Request failed (${res.status})`);
       }
     } catch (err) {
       console.error(err);
+      setRequestError("Could not send the answer. Retry in a moment.");
     } finally {
       setIsLoading(false);
     }
@@ -288,6 +305,7 @@ export default function InterviewPage() {
             >
               {isLoading ? "Initializing…" : "Start interview →"}
             </button>
+            {requestError ? <p className="start-subtext">{requestError}</p> : null}
           </div>
         ) : (
           /* ── STATE B: ACTIVE INTERVIEW WORKSPACE ── */

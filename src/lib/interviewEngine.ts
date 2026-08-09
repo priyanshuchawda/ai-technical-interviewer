@@ -16,7 +16,7 @@ import { interviewFeedbackSchema } from "./feedbackSchema";
 
 export { getSession } from "./sessionStore";
 
-export function createSession(sessionId: string, candidate: CandidateProfile): InterviewSessionState {
+export async function createSession(sessionId: string, candidate: CandidateProfile): Promise<InterviewSessionState> {
   const intelligenceProfile = generateCandidateProfile(candidate);
 
   // Requirement 1: Choose initial focus area from candidate profile
@@ -34,7 +34,7 @@ export function createSession(sessionId: string, candidate: CandidateProfile): I
     intelligenceProfile,
     masteryState: new Map<number, TopicMastery>(),
   };
-  saveSession(state);
+  await saveSession(state);
   return state;
 }
 
@@ -43,14 +43,14 @@ export async function processInterviewTurn(
   candidateInput?: CandidateProfile,
   messageInput?: string
 ): Promise<{ reply: string; done: boolean; feedback?: InterviewFeedback; intelligence?: InterviewIntelligenceState }> {
-  let session = getSession(sessionId);
+  let session = await getSession(sessionId);
 
   // 1. Initial turn / Start Session
   if (!session) {
     if (!candidateInput) {
       throw new Error("Candidate profile is required to initialize a new interview session.");
     }
-    session = createSession(sessionId, candidateInput);
+    session = await createSession(sessionId, candidateInput);
   }
 
   // Active question day that candidate is currently answering
@@ -104,7 +104,8 @@ export async function processInterviewTurn(
     const endReply = `Thank you for completing the technical interview, ${displayFirstName(session.candidate)}. We have thoroughly evaluated your responses across the AI Cohort curriculum modules and generated your detailed assessment feedback.`;
 
     session.history.push({ role: "interviewer", content: endReply });
-    
+    await saveSession(session);
+
     const intelligence = buildInterviewIntelligenceState(
       session,
       session.currentQuestionDay || 7,
@@ -184,6 +185,7 @@ export async function processInterviewTurn(
   }
 
   session.history.push({ role: "interviewer", content: reply });
+  await saveSession(session);
 
   const intelligence = buildInterviewIntelligenceState(
     session,

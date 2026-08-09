@@ -57,7 +57,7 @@ describe("Structured Answer Evaluation Tests", () => {
     await processInterviewTurn(sessionId, sarah);
     await processInterviewTurn(sessionId, undefined, "I don't know how retrieval works at all.");
 
-    const session = getSession(sessionId);
+    const session = await getSession(sessionId);
     const masteryForCurrentDay = session?.masteryState?.get(session.currentQuestionDay!);
     if (masteryForCurrentDay) {
       expect(masteryForCurrentDay.score).toBeLessThan(0.5);

@@ -1,11 +1,19 @@
 export type LogLevel = "info" | "warn" | "error";
 
-export function sessionRef(sessionId: string): string {
+function fnvRef(value: string): string {
   let hash = 0;
-  for (let i = 0; i < sessionId.length; i += 1) {
-    hash = (hash * 31 + sessionId.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
   }
   return hash.toString(16).padStart(8, "0");
+}
+
+export function sessionRef(sessionId: string): string {
+  return fnvRef(sessionId);
+}
+
+export function ipRef(ip: string): string {
+  return fnvRef(ip || "local");
 }
 
 export function log(level: LogLevel, event: string, fields: Record<string, unknown> = {}): void {

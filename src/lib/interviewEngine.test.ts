@@ -10,7 +10,7 @@ describe("InterviewEngine Unit Tests", () => {
     const res = await processInterviewTurn(sessionId, testCandidate);
     expect(res.done).toBe(false);
     expect(res.reply.length).toBeGreaterThan(10);
-    expect(getSession(sessionId)).toBeDefined();
+    expect(await getSession(sessionId)).toBeDefined();
   }, 15000);
 
   it("should accumulate turns and evaluate curriculum days", async () => {

@@ -51,9 +51,9 @@ GEMINI_API_KEY=""
 GEMINI_MODEL="gemini-3.5-flash-lite"
 ```
 
-Optional production vars are listed in `.env.example` (`INTERVIEW_API_KEY`, timeouts, rate limits). Never commit `.env.local` or real API keys.
+Production vars are listed in `.env.example` (`INTERVIEW_API_KEY`, session store, rate limits). Never commit `.env.local` or real API keys.
 
-See [docs/operations.md](docs/operations.md) for deploy, secrets, and runbook notes.
+See [docs/operations.md](docs/operations.md) for deploy, auth, durable sessions, metrics, and runbook notes.
 
 ### 3. Run
 
@@ -68,6 +68,7 @@ Open [http://localhost:3000](http://localhost:3000).
 ```bash
 npm test
 npm run lint
+npm run typecheck
 npm run build
 npx tsx src/scripts/test-api.ts
 ```
