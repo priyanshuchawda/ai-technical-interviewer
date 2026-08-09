@@ -15,7 +15,7 @@ Autonomous Interviewer is a multi-turn technical interviewer that follows the ca
 
 [![Watch the demo](./public/demo/poster.jpg)](https://github.com/priyanshuchawda/ai-technical-interviewer/blob/main/public/demo/autonomous-interviewer-demo.mp4)
 
-[Watch the 1:56 demo with voice-over →](https://github.com/priyanshuchawda/ai-technical-interviewer/blob/main/public/demo/autonomous-interviewer-demo.mp4) · [Captions](./public/demo/autonomous-interviewer-demo.srt)
+[Watch the 1:45 demo with voice-over →](https://github.com/priyanshuchawda/ai-technical-interviewer/blob/main/public/demo/autonomous-interviewer-demo.mp4) · [Captions](./public/demo/autonomous-interviewer-demo.srt)
 
 Sarah Johnson interviews for Senior Data Engineer. The interviewer goes deeper on observability, introduces a focused coding check only when a claim should be tested, then produces an evidence-backed assessment.
 
