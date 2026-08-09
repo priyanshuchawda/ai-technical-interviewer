@@ -375,3 +375,72 @@ Requirements:
 
 15. Do not expose chain-of-thought.
 ```
+
+## Canonical Curriculum Day Mapping Fix Implementation Prompt
+```
+We found a critical curriculum-state mapping bug during manual testing. Do not add any new features until this is fixed.
+
+The interview conversation is asking reasonable questions, but curriculum day IDs and topic names are becoming mismatched in the intelligence state.
+
+Observed example:
+
+- Day 7 should be Embeddings Explained
+- Day 12 should be Prompt Engineering Fundamentals
+- Day 28 should be Docker & Kubernetes Deployment
+- Day 29 should be Monitoring, Logging & Observability
+
+However, the UI currently displayed mappings such as:
+- Day 29: Prompt Engineering Fundamentals
+- Day 12: Docker & Kubernetes Deployment
+- Day 28: Embeddings Explained
+
+This indicates that some state is using an array/index/iteration position instead of the actual curriculum day identifier, or otherwise mixing day metadata.
+
+Inspect the entire curriculum-day data flow, especially:
+- candidateProfiler.ts
+- interviewEngine.ts
+- answerEvaluator.ts
+- feedbackGenerator.ts
+- prompts.ts
+- dataService.ts
+- interview.ts types
+- intelligence payload construction
+- masteryState construction
+- recommendedFocusAreas
+- any curriculum lookup helpers
+
+Find the root cause rather than patching the three displayed values individually.
+
+Requirements:
+
+1. Establish one canonical curriculum lookup mechanism where the actual curriculum `day` number is the source of truth.
+
+2. Never derive a curriculum day number from an array index.
+
+3. Ensure every curriculum reference preserves its actual:
+   - day number
+   - title
+   - module
+   - objectives
+   - topics/tools where applicable
+
+4. Ensure masteryState keys represent the actual curriculum day number.
+
+5. Ensure currentDay/currentTopic always refer to the same curriculum record.
+
+6. Ensure candidate recommendedFocusAreas use the actual curriculum day number.
+
+7. Ensure answer evaluation receives the actual current curriculum record rather than a record selected by positional index.
+
+8. Ensure intelligence UI serialization uses the canonical curriculum record.
+
+9. Ensure final feedback recommendations use the actual curriculum day number and title.
+
+10. Preserve the existing adaptive behavior.
+
+11. Do not redesign the UI.
+
+12. Do not remove Breeth.
+
+13. Do not change POST /api/interview or the sessionId contract.
+```
