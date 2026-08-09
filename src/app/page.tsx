@@ -147,7 +147,7 @@ export default function InterviewPage() {
 
   useEffect(() => {
     const storedTheme = window.localStorage.getItem("interview-theme") as Theme | null;
-    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    const systemTheme = typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     setTheme(storedTheme || systemTheme);
   }, []);
 
