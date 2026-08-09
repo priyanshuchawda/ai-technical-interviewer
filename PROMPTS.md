@@ -254,3 +254,69 @@ The panel should make the system's adaptive behavior demonstrable to a hackathon
 
 Add focused tests for any new serialization/API state required by the panel.
 ```
+
+## Evidence-Backed Final Interview Feedback Implementation Prompt
+```
+Implement the next incremental feature: evidence-backed final interview feedback.
+
+Inspect the current interview state, answer evaluation, mastery state, candidate profile, curriculum data, Breeth integration, and intelligence payload before modifying anything.
+
+When the interview reaches its existing completion condition, generate structured final feedback using the evidence accumulated during the actual interview.
+
+The final feedback must contain exactly the required conceptual fields:
+- summary
+- strengths
+- gaps
+- next
+
+Keep the existing API contract compatible.
+
+Feedback requirements:
+
+1. SUMMARY
+Provide a concise assessment of the candidate's demonstrated technical performance during this interview.
+
+2. STRENGTHS
+Select only concepts/topics supported by actual interview evidence.
+Use demonstrated concepts and strong/partial evaluations.
+Do not call a topic a strength merely because the candidate passed that cohort mission.
+
+3. GAPS
+Identify concepts that were weak, unknown, or repeatedly missing during the interview.
+Use current mastery and missing concepts.
+Skipped or high-attempt historical topics may be used as supporting context, but must not by themselves be treated as current interview weaknesses.
+
+4. NEXT
+Produce concise, actionable curriculum-grounded recommendations.
+Reference relevant curriculum days/topics where useful.
+Recommendations should follow directly from identified gaps.
+
+5. HISTORICAL VS CURRENT EVIDENCE
+Keep these conceptually separate:
+- candidate history = prior learning signal
+- interview evidence = current demonstrated ability
+
+A candidate's interview evidence must be able to contradict their historical profile.
+
+6. Do not expose hidden chain-of-thought.
+Feedback should contain conclusions and short evidence-based explanations only.
+
+7. If there is insufficient evidence for a strong conclusion, say so rather than inventing one.
+
+8. Preserve the existing Breeth integration and intelligence panel.
+
+9. Do not redesign the UI in this step.
+Do not add a database.
+Do not add another required external API call solely for feedback.
+
+Prefer deterministic aggregation of the structured mastery/evaluation state. If the existing architecture already uses the LLM for final wording, constrain it with the structured evidence and validate the returned fields.
+
+Add focused tests for:
+- strengths coming from strong demonstrated interview concepts
+- gaps coming from weak/unknown/missing concepts
+- historical high-attempt data not automatically becoming an interview gap
+- next steps mapping to curriculum topics
+- all four required feedback fields being present
+- existing API contract remaining valid
+- existing tests continuing to pass
+```

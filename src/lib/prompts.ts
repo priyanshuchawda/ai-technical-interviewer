@@ -1,4 +1,4 @@
-import { CandidateProfile, CandidateIntelligenceProfile, CurriculumDay, ResponseOutcome, TopicMastery } from "../types/interview";
+import { CandidateProfile, CandidateIntelligenceProfile, CurriculumDay, ResponseOutcome, TopicMastery, InterviewFeedback } from "../types/interview";
 
 /**
  * System prompt template for conducting dynamic multi-turn technical interviews.
@@ -56,7 +56,6 @@ Last Outcome: ${masteryContext.lastOutcome}
 `;
   }
 
-
   let adaptiveGuidance = "";
   if (lastOutcome === "unknown") {
     adaptiveGuidance = `
@@ -101,16 +100,38 @@ Instructions:
 export function buildFeedbackSystemPrompt(
   candidate: CandidateProfile,
   evaluatedDays: number[],
-  intelligenceProfile?: CandidateIntelligenceProfile
+  intelligenceProfile?: CandidateIntelligenceProfile,
+  evidenceFeedback?: InterviewFeedback
 ): string {
   let profileContext = "";
   if (intelligenceProfile) {
-    profileContext = `\nCandidate Intelligence Context: ${intelligenceProfile.seniorityContext}. High Attempt Topics: ${intelligenceProfile.highAttemptTopics.join(", ") || "None"}. Skipped Topics: ${intelligenceProfile.skippedAreas.join(", ") || "None"}.`;
+    profileContext = `\nCandidate Intelligence Context: ${intelligenceProfile.seniorityContext}.`;
+  }
+
+  let evidenceContext = "";
+  if (evidenceFeedback) {
+    evidenceContext = `
+=== ACCUMULATED LIVE INTERVIEW EVIDENCE ===
+Demonstrated Strengths (Use ONLY live demonstrated concepts):
+${evidenceFeedback.strengths.map((s) => `- ${s}`).join("\n")}
+
+Identified Gaps (Use ONLY live weak/unknown/missing concepts):
+${evidenceFeedback.gaps.map((g) => `- ${g}`).join("\n")}
+
+Curriculum Next Steps (Map directly to live gaps):
+${evidenceFeedback.next.map((n) => `- ${n}`).join("\n")}
+`;
   }
 
   return `You are a Principal AI Architect evaluating a completed technical interview.
 Candidate: ${candidate.member.name} (${candidate.member.jobRole})
 Evaluated Days: ${evaluatedDays.join(", ")}${profileContext}
+${evidenceContext}
+
+Instructions:
+- Base your evaluation STRICTLY on the accumulated live interview evidence provided above.
+- Do NOT treat historical skipped or high-attempt topics as live weaknesses unless they were demonstrated as weak/unknown during the live interview.
+- Do NOT invent non-existent concepts.
 
 Generate structured assessment feedback as a JSON object matching this exact schema:
 {

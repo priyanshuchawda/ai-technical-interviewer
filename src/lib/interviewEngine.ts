@@ -6,6 +6,7 @@ import { buildInterviewerSystemPrompt, buildFeedbackSystemPrompt } from "./promp
 import { generateCandidateProfile } from "./candidateProfiler";
 import { classifyResponseOutcome } from "./responseClassifier";
 import { evaluateAnswer, updateTopicMastery } from "./answerEvaluator";
+import { generateEvidenceBackedFeedback } from "./feedbackGenerator";
 
 // Global session state cache (In-memory for active API sessions)
 const sessions = new Map<string, InterviewSessionState>();
@@ -286,10 +287,13 @@ async function generateTurnWithGemini(
 
 async function generateFeedbackWithGemini(session: InterviewSessionState): Promise<InterviewFeedback> {
   const candidate = session.candidate;
+  const evidenceFeedback = generateEvidenceBackedFeedback(session);
+
   const systemInstruction = buildFeedbackSystemPrompt(
     candidate,
     Array.from(session.evaluatedDays),
-    session.intelligenceProfile
+    session.intelligenceProfile,
+    evidenceFeedback
   );
 
   const conversationSummary = session.history
@@ -299,7 +303,7 @@ async function generateFeedbackWithGemini(session: InterviewSessionState): Promi
   const contents: GeminiMessage[] = [
     {
       role: "user",
-      parts: [{ text: `Here is the full interview transcript:\n\n${conversationSummary}\n\nGenerate structured evaluation feedback.` }],
+      parts: [{ text: `Here is the full interview transcript:\n\n${conversationSummary}\n\nGenerate structured evaluation feedback matching the accumulated evidence.` }],
     },
   ];
 
@@ -310,28 +314,8 @@ async function generateFeedbackWithGemini(session: InterviewSessionState): Promi
       return parsed as InterviewFeedback;
     }
   } catch (err) {
-    console.error("[Gemini Feedback Generation Error, using fallback]:", err);
+    console.error("[Gemini Feedback Generation Error, using evidence-backed fallback]:", err);
   }
 
-  return fallbackFeedback(session);
-}
-
-function fallbackFeedback(session: InterviewSessionState): InterviewFeedback {
-  const candidate = session.candidate;
-  return {
-    summary: `${candidate.member.name} completed a multi-turn technical evaluation covering ${session.evaluatedDays.size} curriculum days. The candidate demonstrated practical understanding as a ${candidate.member.jobRole}.`,
-    strengths: [
-      `Demonstrated active engagement across ${session.evaluatedDays.size} core curriculum modules.`,
-      `Solid familiarity with AI cohort missions and system design principles.`,
-      `Clear technical articulation during conversation turns.`
-    ],
-    gaps: [
-      `Could deepen analysis on production telemetry and scale constraints.`,
-      `Additional hands-on iteration recommended for skipped curriculum topics.`
-    ],
-    next: [
-      `Review end-to-end evaluation metrics (Ragas, TruLens) in production environments.`,
-      `Practice real-time streaming architectures and system protocol tooling.`
-    ]
-  };
+  return evidenceFeedback;
 }
