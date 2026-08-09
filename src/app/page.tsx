@@ -24,7 +24,7 @@ function obClass(o: ResponseOutcome | undefined) {
 
 function obLabel(o: ResponseOutcome | undefined) {
   if (!o) return "—";
-  if (o === "off_topic") return "Off Topic";
+  if (o === "off_topic") return "Off topic";
   return o.charAt(0).toUpperCase() + o.slice(1);
 }
 
@@ -33,59 +33,54 @@ function mbFill(s: number) {
   if (s >= 0.4) return "mb-fill mb-blue";
   return "mb-fill mb-red";
 }
+
 function mbColor(s: number): React.CSSProperties {
   if (s >= 0.65) return { color: "var(--green)" };
   if (s >= 0.4) return { color: "var(--blue)" };
   return { color: "#ef4444" };
 }
 
-/** Parse backend whyThisQuestion string into labelled rows.
- *  The backend emits lines like:
- *  "Profile signal: Some text. Assessment strategy: More text."
- *  We split on the known keys and render each as a labelled row. */
+/**
+ * Clean human-readable parser for "Why This Question".
+ * Parses raw intelligence signal strings into clean, concise labelled rows (Profile, Goal, Next).
+ */
 function parseWhy(raw: string): Array<{ key: string; val: string }> {
-  // Try structured split on known signal prefixes
   const prefixes = [
-    "Profile signal",
-    "Previous answer",
-    "Current mastery",
-    "Assessment strategy",
-    "Curriculum objective",
-    "Current evidence",
+    { match: "Profile signal", label: "Profile" },
+    { match: "Previous answer", label: "Previous" },
+    { match: "Current mastery", label: "Mastery" },
+    { match: "Assessment strategy", label: "Next" },
+    { match: "Curriculum objective", label: "Goal" },
+    { match: "Current evidence", label: "Evidence" },
   ];
 
-  // Build a regex that matches any prefix followed by ':'
   const parts: Array<{ key: string; val: string }> = [];
   let remaining = raw;
 
   for (let i = 0; i < prefixes.length; i++) {
-    const key = prefixes[i];
-    const idx = remaining.indexOf(key + ":");
+    const { match, label } = prefixes[i];
+    const idx = remaining.indexOf(match + ":");
     if (idx === -1) continue;
-    // anything before this key (previous segment tail) already pushed
-    const afterColon = remaining.slice(idx + key.length + 1).trim();
-    // find the next prefix
+    const afterColon = remaining.slice(idx + match.length + 1).trim();
     let end = afterColon.length;
     for (let j = i + 1; j < prefixes.length; j++) {
-      const ni = afterColon.indexOf(prefixes[j] + ":");
+      const ni = afterColon.indexOf(prefixes[j].match + ":");
       if (ni !== -1 && ni < end) end = ni;
     }
     const val = afterColon.slice(0, end).replace(/\.$/, "").trim();
-    if (val) parts.push({ key, val });
+    if (val) parts.push({ key: label, val });
     remaining = afterColon.slice(end);
   }
 
-  // Fallback: if nothing parsed, show raw as a single block
   if (parts.length === 0) {
-    // Split by ". " as rough sentences
     const sentences = raw.split(/\.\s+/).filter(Boolean);
     if (sentences.length > 1) {
       return sentences.slice(0, 3).map((s, i) => ({
-        key: i === 0 ? "Signal" : i === 1 ? "Strategy" : "Context",
+        key: i === 0 ? "Profile" : i === 1 ? "Goal" : "Next",
         val: s.replace(/\.$/, "").trim(),
       }));
     }
-    return [{ key: "Context", val: raw }];
+    return [{ key: "Goal", val: raw }];
   }
   return parts;
 }
@@ -129,11 +124,11 @@ function EvalBlock({ ev }: { ev: NonNullable<InterviewIntelligenceState["latestE
   const off = ev.outcome === "off_topic";
   const pct = Math.round(ev.score * 100);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+    <div className="eval-anim" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
         <span className={obClass(ev.outcome)}>{obLabel(ev.outcome)}</span>
         {!off && (
-          <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--ink-2)" }}>{pct}%</span>
+          <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--ink-2)" }}>· {pct}%</span>
         )}
       </div>
 
@@ -157,7 +152,7 @@ function EvalBlock({ ev }: { ev: NonNullable<InterviewIntelligenceState["latestE
 
       {!off && ev.missingConcepts.length > 0 && (
         <div>
-          <span className="eyebrow" style={{ marginBottom: "4px" }}>Missing</span>
+          <span className="eyebrow" style={{ marginBottom: "4px" }}>Still to cover</span>
           <div className="clist">
             {ev.missingConcepts.slice(0, 3).map((c, i) => (
               <div key={i} className="ci"><span className="ci-a">·</span><span>{c}</span></div>
@@ -264,22 +259,20 @@ export default function InterviewPage() {
   const totalTurns = 8;
   const currentTurn = intelligence?.progress?.turnCount ?? 0;
 
-  // live status
+  // Header status text
   const dotClass = isStarted ? (isDone ? "live-dot done" : "live-dot active") : "live-dot";
-  const liveText = isStarted ? (isDone ? "Completed" : "Live interview") : "Ready";
+  const liveText = isStarted ? (isDone ? "Completed" : "Live interview") : "Ready to start";
 
-  // current focus day from intelligence
+  // Current focus day from intelligence
   const currentDay = intelligence?.currentDay;
 
-  // mastery for the current curriculum day (if available)
+  // Mastery for current topic
   const currentMastery = intelligence?.masteryScores.find((ms) => ms.day === currentDay);
   const currentMasteryPct = currentMastery ? Math.round(currentMastery.score * 100) : null;
 
   /**
    * Candidate-specific recommended focus areas derived from the existing
-   * generateCandidateProfile logic. This is the canonical source — the same
-   * function the backend uses — so pre/post-interview focus areas are always
-   * consistent and candidate-specific. Never falls back to missions.slice().
+   * generateCandidateProfile logic. Canonical source of truth.
    */
   const profileFocusAreas = useMemo(
     () => generateCandidateProfile(selectedCandidate).recommendedFocusAreas,
@@ -293,7 +286,7 @@ export default function InterviewPage() {
         <div className="hdr-inner">
           <div>
             <div className="brand-name">Autonomous Interviewer</div>
-            <div className="brand-sub">Adaptive technical assessment</div>
+            <div className="brand-sub">Technical assessment</div>
           </div>
           <div className="hdr-right">
             {/* progress counter — visible once started */}
@@ -336,28 +329,27 @@ export default function InterviewPage() {
         <aside className="sticky" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 
           {/* Candidate card */}
-          <div className="panel">
+          <div className="panel fade-swap">
             <div className="ps">
               <span className="eyebrow">Candidate</span>
               <div className="cand-name">{m.name}</div>
               <div className="cand-role">{m.jobRole}</div>
               <div className="cand-stats">
-                <span>{m.yearsExperience} yrs experience · {m.education}</span>
+                <span>{m.yearsExperience} years experience · {m.education}</span>
                 <span style={{ marginTop: 4 }}>
                   <strong>{sig.missionsCompleted}</strong> missions ·{" "}
-                  <strong>{sig.missionsFirstTry}</strong> first-try ·{" "}
-                  <strong>{sig.commitDays}</strong> commit days
+                  <strong>{sig.missionsFirstTry}</strong> first-attempt passes ·{" "}
+                  <strong>{sig.commitDays}</strong> active days
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Assessment plan — always uses profileFocusAreas (candidate-specific recommendedFocusAreas)
-               Post-interview: highlights the current active day from intelligence. */}
+          {/* Interview plan */}
           {profileFocusAreas.length > 0 && (
-            <div className="panel">
+            <div className="panel fade-swap">
               <div className="ps">
-                <span className="eyebrow">Assessment Focus</span>
+                <span className="eyebrow">Interview Plan</span>
                 <div className="plan-list">
                   {profileFocusAreas.map((fa, i) => {
                     const isCurrent = isStarted && fa.day === currentDay;
@@ -401,7 +393,7 @@ export default function InterviewPage() {
             </div>
           )}
 
-          {/* Conversation / empty */}
+          {/* Conversation / briefing */}
           <div className="convo-panel">
             {!isStarted ? (
               /* ── Assessment briefing (pre-interview) ── */
@@ -412,16 +404,13 @@ export default function InterviewPage() {
                   <span className="briefing-role">{m.jobRole}</span>
                 </div>
                 <p className="briefing-desc">
-                  An 8-question adaptive assessment evaluating your understanding of the
-                  AI Cohort curriculum. Questions are selected based on your cohort history,
-                  completed and skipped missions, and topic mastery.
+                  8 questions based on your cohort progress and interview performance.
+                  Questions will adjust as you answer.
                 </p>
                 <div className="briefing-meta">
                   <span>8 questions</span>
                   <span className="briefing-sep">·</span>
                   <span>4+ curriculum areas</span>
-                  <span className="briefing-sep">·</span>
-                  <span>Live adaptive assessment</span>
                 </div>
                 <button
                   id="start-interview-btn"
@@ -429,7 +418,7 @@ export default function InterviewPage() {
                   onClick={startInterview}
                   disabled={isLoading}
                 >
-                  {isLoading ? "Initializing…" : "Start Technical Interview →"}
+                  {isLoading ? "Initializing…" : "Start interview →"}
                 </button>
               </div>
             ) : (
@@ -530,17 +519,17 @@ export default function InterviewPage() {
           )}
         </div>
 
-        {/* ── RIGHT COLUMN — INTELLIGENCE ─────────────────────── */}
+        {/* ── RIGHT COLUMN — LIVE ASSESSMENT ─────────────────────── */}
         <aside className="sticky">
           <div className="panel intel-col">
 
             {!isStarted ? (
-              /* ── Assessment Profile (pre-interview right panel) ── */
+              /* ── Pre-interview Right Panel (Interview Plan & What to expect) ── */
               <>
-                <div className="ps">
-                  <span className="eyebrow">Assessment Profile</span>
+                <div className="ps fade-swap">
+                  <span className="eyebrow">Interview Plan</span>
                   <div style={{ fontSize: 12, color: "var(--ink-3)", lineHeight: 1.5, marginBottom: 10 }}>
-                    Priority focus areas derived from {m.name}&apos;s cohort history.
+                    Based on {m.name.split(" ")[0]}&apos;s cohort progress
                   </div>
                   <div className="plan-list">
                     {profileFocusAreas.map((fa, i) => (
@@ -555,13 +544,13 @@ export default function InterviewPage() {
                   </div>
                 </div>
                 <div className="divider" />
-                <div className="ps">
-                  <span className="eyebrow">Adaptive Assessment</span>
-                  <div className="cand-stats" style={{ gap: 5 }}>
-                    <span>8 questions · 4+ curriculum areas</span>
-                    <span>Profile-driven question selection</span>
-                    <span>Live mastery tracking</span>
-                    <span>Breeth Graph Memory context</span>
+                <div className="ps fade-swap">
+                  <span className="eyebrow">What to Expect</span>
+                  <div className="clist" style={{ gap: 6 }}>
+                    <div className="ci"><span className="ci-g">·</span><span>8 questions</span></div>
+                    <div className="ci"><span className="ci-g">·</span><span>Questions adjust based on your answers</span></div>
+                    <div className="ci"><span className="ci-g">·</span><span>Your progress is tracked throughout the interview</span></div>
+                    <div className="ci"><span className="ci-g">·</span><span>Previous answers can influence later questions</span></div>
                   </div>
                 </div>
               </>
@@ -569,7 +558,7 @@ export default function InterviewPage() {
               <>
                 {/* Current focus */}
                 <div className="ps">
-                  <span className="eyebrow">Interview Intelligence</span>
+                  <span className="eyebrow">Live Assessment</span>
                   <div style={{ fontSize: 14, fontWeight: 700, color: "var(--ink-1)", marginBottom: 1 }}>
                     Day {intelligence.currentDay}
                   </div>
@@ -598,12 +587,12 @@ export default function InterviewPage() {
                   </>
                 )}
 
-                {/* Latest evaluation */}
+                {/* Latest answer */}
                 {intelligence.latestEvaluation && (
                   <>
                     <div className="divider" />
                     <div className="ps">
-                      <span className="eyebrow">Latest Evaluation</span>
+                      <span className="eyebrow">Latest Answer</span>
                       <EvalBlock ev={intelligence.latestEvaluation} />
                     </div>
                   </>
@@ -625,14 +614,14 @@ export default function InterviewPage() {
                 {/* Why this question */}
                 <div className="divider" />
                 <div className="ps">
-                  <span className="eyebrow">Why This Question?</span>
+                  <span className="eyebrow">Why This Question</span>
                   <WhyBlock raw={intelligence.whyThisQuestion} />
                 </div>
 
                 {/* Breeth memory context */}
                 <div className="divider" />
                 <div className="ps">
-                  <span className="eyebrow">Memory Context</span>
+                  <span className="eyebrow">Memory</span>
                   <div className="breeth-row">
                     <span className="breeth-dot" />
                     <span className="breeth-name">Breeth Graph Memory</span>
@@ -640,7 +629,7 @@ export default function InterviewPage() {
                   <div className="breeth-count">
                     {intelligence.masteryScores.length > 0
                       ? `${intelligence.masteryScores.length} topic${intelligence.masteryScores.length !== 1 ? "s" : ""} in session memory`
-                      : "Memory indexing active"}
+                      : "Memory active"}
                   </div>
                 </div>
               </>
