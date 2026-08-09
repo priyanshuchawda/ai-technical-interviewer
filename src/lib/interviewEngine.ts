@@ -10,6 +10,9 @@ import { generateEvidenceBackedFeedback } from "./feedbackGenerator";
 import { getSession, saveSession } from "./sessionStore";
 import { displayFirstName } from "./pii";
 import { log, sessionRef } from "./logger";
+import { detectPromptInjection, wrapUntrustedAnswer } from "./promptGuard";
+import { compactHistory } from "./historyCompact";
+import { interviewFeedbackSchema } from "./feedbackSchema";
 
 export { getSession } from "./sessionStore";
 
@@ -66,7 +69,9 @@ export async function processInterviewTurn(
     session.turnCount += 1;
 
     // Classify answer into structured outcome against active question day
-    lastOutcome = classifyResponseOutcome(messageInput, activeCurriculumDay);
+    lastOutcome = detectPromptInjection(messageInput)
+      ? "off_topic"
+      : classifyResponseOutcome(messageInput, activeCurriculumDay);
     session.lastOutcome = lastOutcome;
 
     // Stream to Breeth memory graph asynchronously (Preserve Breeth integration)
@@ -277,10 +282,10 @@ async function generateTurnWithGemini(
   // Build message contents for Gemini
   const contents: GeminiMessage[] = [];
 
-  for (const item of session.history) {
+  for (const item of compactHistory(session.history)) {
     contents.push({
       role: item.role === "candidate" ? "user" : "model",
-      parts: [{ text: item.content }],
+      parts: [{ text: item.role === "candidate" ? wrapUntrustedAnswer(item.content) : item.content }],
     });
   }
 
@@ -324,9 +329,9 @@ async function generateFeedbackWithGemini(session: InterviewSessionState): Promi
 
   try {
     const rawJson = await generateGeminiContent(contents, systemInstruction, true);
-    const parsed = JSON.parse(rawJson);
-    if (parsed.summary && Array.isArray(parsed.strengths) && Array.isArray(parsed.gaps) && Array.isArray(parsed.next)) {
-      return parsed as InterviewFeedback;
+    const parsed = interviewFeedbackSchema.safeParse(JSON.parse(rawJson));
+    if (parsed.success) {
+      return parsed.data;
     }
   } catch {
     log("error", "gemini.feedback_failed", { session: sessionRef(session.sessionId) });

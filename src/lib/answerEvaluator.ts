@@ -1,5 +1,7 @@
 import { AnswerEvaluation, CurriculumDay } from "../types/interview";
 import { classifyResponseOutcome } from "./responseClassifier";
+import { curriculum } from "./dataService";
+import { idfWeightedOverlap, tokenize } from "./textStats";
 
 /**
  * Deterministically evaluates a candidate answer against curriculum day objectives.
@@ -22,7 +24,17 @@ export function evaluateAnswer(
     "application", "optimized", "scalable", "created", "build", "built", "through",
   ]);
 
-  if (lowerAnswer.length < 12 && outcome !== "unknown" && outcome !== "off_topic") {
+  if (outcome === "unknown") {
+    return {
+      outcome,
+      score: 0,
+      demonstratedConcepts: [],
+      missingConcepts: allConcepts.filter((c) => c.length < 80),
+      evidence: "Candidate indicated no knowledge of this topic.",
+    };
+  }
+
+  if (lowerAnswer.length < 12 && outcome !== "off_topic") {
     return {
       outcome: "weak",
       score: 0.1,
@@ -49,10 +61,14 @@ export function evaluateAnswer(
   const demonstratedConcepts: string[] = [];
   const missingConcepts: string[] = [];
 
+  const { df, documentCount } = getConceptIdfCorpus();
+  const answerTokens = tokenize(answer);
+
   for (const concept of allConcepts) {
     const keywords = concept.toLowerCase().split(/[\s,&]+/).filter((w) => w.length > 4 && !genericWords.has(w));
-    const mentioned = keywords.some((kw) => lowerAnswer.includes(kw));
-    if (mentioned) {
+    const keywordHit = keywords.some((kw) => lowerAnswer.includes(kw));
+    const idfScore = idfWeightedOverlap(tokenize(concept), answerTokens, df, documentCount);
+    if (keywordHit || idfScore >= 0.34) {
       demonstratedConcepts.push(concept);
     } else if (concept.length < 80) { // skip overly long objectives from missing list
       missingConcepts.push(concept);
@@ -65,7 +81,7 @@ export function evaluateAnswer(
     case "strong": baseScore = 0.8; break;
     case "partial": baseScore = 0.5; break;
     case "weak": baseScore = 0.2; break;
-    case "unknown": baseScore = 0.0; break;
+    default: baseScore = 0.0; break;
   }
 
   const conceptCoverage = allConcepts.length > 0
@@ -81,9 +97,7 @@ export function evaluateAnswer(
 
   // Evidence: concise summary
   let evidence = "";
-  if (outcome === "unknown") {
-    evidence = "Candidate indicated no knowledge of this topic.";
-  } else if (outcome === "weak") {
+  if (outcome === "weak") {
     evidence = `Candidate gave a brief/uncertain answer. Demonstrated ${demonstratedConcepts.length} of ${allConcepts.length} expected concepts.`;
   } else if (outcome === "partial") {
     evidence = `Candidate showed partial understanding. Demonstrated: ${demonstratedConcepts.slice(0, 2).join(", ") || "some familiarity"}.`;
@@ -92,6 +106,27 @@ export function evaluateAnswer(
   }
 
   return { outcome, score, demonstratedConcepts, missingConcepts, evidence };
+}
+
+let conceptIdfCache: { df: Map<string, number>; documentCount: number } | null = null;
+
+function getConceptIdfCorpus(): { df: Map<string, number>; documentCount: number } {
+  if (conceptIdfCache) return conceptIdfCache;
+  const docs: string[][] = [];
+  for (const day of curriculum.days) {
+    const concepts = [day.title, ...(day.topics || []), ...(day.tools || []), ...(day.objectives || [])];
+    for (const concept of concepts) {
+      docs.push(tokenize(concept));
+    }
+  }
+  const df = new Map<string, number>();
+  for (const doc of docs) {
+    for (const token of new Set(doc)) {
+      df.set(token, (df.get(token) || 0) + 1);
+    }
+  }
+  conceptIdfCache = { df, documentCount: docs.length };
+  return conceptIdfCache;
 }
 
 /**

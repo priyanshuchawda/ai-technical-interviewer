@@ -1,4 +1,5 @@
 import { log } from "./logger";
+import { rankMemorySnippets } from "./memoryRank";
 
 export function getSearchTimeoutMs(): number {
   const raw = Number(process.env.BREETH_TIMEOUT_MS);
@@ -62,7 +63,7 @@ export class BreethClient {
       };
       const rawResults = data.episodes || data.results || data.memories || [];
 
-      return rawResults.map((item) => {
+      const snippets = rawResults.map((item) => {
         if (typeof item === "string") return item;
         if (!item || typeof item !== "object") return "";
         const record = item as { content?: unknown; narrative?: unknown; summary?: unknown };
@@ -71,6 +72,8 @@ export class BreethClient {
         if (typeof record.summary === "string") return record.summary;
         return JSON.stringify(item);
       }).filter((text) => text.trim().length > 0);
+
+      return rankMemorySnippets(query, snippets, limit);
     } catch {
       clearTimeout(timeoutId);
       log("warn", "breeth.search_skipped");

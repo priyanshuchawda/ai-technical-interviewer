@@ -1,3 +1,6 @@
+import { llmCircuit } from "./circuitBreaker";
+import { withRetry } from "./retry";
+
 export interface GeminiMessage {
   role: "user" | "model";
   parts: Array<{ text: string }>;
@@ -6,6 +9,12 @@ export interface GeminiMessage {
 export function getGeminiTimeoutMs(): number {
   const raw = Number(process.env.GEMINI_TIMEOUT_MS);
   return Number.isFinite(raw) && raw > 0 ? raw : 20_000;
+}
+
+class ProviderHttpError extends Error {
+  constructor(public status: number) {
+    super(`Gemini API call failed (${status})`);
+  }
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
@@ -18,8 +27,11 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
   }
 }
 
-function shouldRetry(status: number): boolean {
-  return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+function shouldRetry(error: unknown): boolean {
+  if (error instanceof ProviderHttpError) {
+    return error.status === 429 || error.status >= 500;
+  }
+  return error instanceof Error && /aborted|timeout/i.test(error.message);
 }
 
 export async function generateGeminiContent(
@@ -32,6 +44,9 @@ export async function generateGeminiContent(
 
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY environment variable is not configured.");
+  }
+  if (!llmCircuit.canRequest()) {
+    throw new Error("LLM_CIRCUIT_OPEN");
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
@@ -63,21 +78,26 @@ export async function generateGeminiContent(
     body: JSON.stringify(requestBody),
   };
 
-  const timeoutMs = getGeminiTimeoutMs();
-  let response = await fetchWithTimeout(url, init, timeoutMs);
-  if (!response.ok && shouldRetry(response.status)) {
-    response = await fetchWithTimeout(url, init, timeoutMs);
+  try {
+    const text = await withRetry(async () => {
+      const response = await fetchWithTimeout(url, init, getGeminiTimeoutMs());
+      if (!response.ok) {
+        throw new ProviderHttpError(response.status);
+      }
+      const data = await response.json();
+      const output = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!output) {
+        throw new Error("No response text received from Gemini API");
+      }
+      return output as string;
+    }, {
+      retries: 2,
+      shouldRetry,
+    });
+    llmCircuit.recordSuccess();
+    return text;
+  } catch (error) {
+    llmCircuit.recordFailure();
+    throw error;
   }
-
-  if (!response.ok) {
-    throw new Error(`Gemini API call failed (${response.status})`);
-  }
-
-  const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) {
-    throw new Error("No response text received from Gemini API");
-  }
-
-  return text;
 }

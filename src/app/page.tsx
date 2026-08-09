@@ -95,6 +95,7 @@ export default function InterviewPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Keyboard listener: Cmd/Ctrl+Enter, Esc
   useEffect(() => {
@@ -113,13 +114,16 @@ export default function InterviewPage() {
 
   const startInterview = async () => {
     setIsLoading(true);
-    const sid = `session-${Date.now()}`;
+    abortRef.current?.abort();
+    const sid = crypto.randomUUID();
     setSessionId(sid);
+    abortRef.current = new AbortController();
     try {
       const res = await fetch("/api/interview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId: sid, candidate: selectedCandidate }),
+        signal: abortRef.current.signal,
       });
       const data = await res.json();
       if (res.ok && data.reply) {
@@ -140,11 +144,14 @@ export default function InterviewPage() {
     setInputMessage("");
     setMessages((p) => [...p, { role: "candidate", content: text }]);
     setIsLoading(true);
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
     try {
       const res = await fetch("/api/interview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId, message: text }),
+        signal: abortRef.current.signal,
       });
       const data = await res.json();
       if (res.ok) {
@@ -359,14 +366,27 @@ export default function InterviewPage() {
                 />
                 <div className="composer-footer">
                   <span className="kbd-hint">⌘ Enter to submit</span>
-                  <button
-                    id="submit-response-btn"
-                    className="btn-submit"
-                    onClick={sendTurn}
-                    disabled={isLoading || !inputMessage.trim()}
-                  >
-                    {isLoading ? "Evaluating…" : "Submit →"}
-                  </button>
+                  {isLoading ? (
+                    <button
+                      id="cancel-response-btn"
+                      className="btn-submit"
+                      onClick={() => {
+                        abortRef.current?.abort();
+                        setIsLoading(false);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  ) : (
+                    <button
+                      id="submit-response-btn"
+                      className="btn-submit"
+                      onClick={sendTurn}
+                      disabled={!inputMessage.trim()}
+                    >
+                      Submit →
+                    </button>
+                  )}
                 </div>
               </div>
             )}
