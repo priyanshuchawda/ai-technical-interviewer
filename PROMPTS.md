@@ -154,3 +154,59 @@ GIT:
 - push to:
   https://github.com/priyanshuchawda/autonomous-ai-interviewer
 ```
+
+## Structured Answer Evaluation and Per-Topic Mastery Evidence Implementation Prompt
+```
+Implement the next incremental feature: structured answer evaluation and per-topic mastery evidence.
+
+Inspect the current candidateProfiler, responseClassifier, interviewEngine, prompts, curriculum data, and Breeth integration before modifying anything.
+
+Do not redesign the UI or API contract.
+
+For each substantive candidate response, have the interviewer produce a small structured evaluation containing:
+
+- outcome: strong | partial | weak | unknown
+- score: 0 to 1
+- demonstratedConcepts: string[]
+- missingConcepts: string[]
+- evidence: short string
+
+The evaluation must be grounded in the current curriculum day and its objectives. Do not invent objectives or claim mastery of concepts that were not actually demonstrated.
+
+Add an interview-level mastery state keyed by curriculum day/topic. It should accumulate evidence across turns instead of treating a single answer as definitive mastery.
+
+Example:
+
+{
+  "day": 10,
+  "topic": "The Retrieval & Matching Engine",
+  "score": 0.62,
+  "attempts": 2,
+  "demonstratedConcepts": ["SQL vs vector retrieval"],
+  "missingConcepts": ["hybrid retrieval"]
+}
+
+Use this state to improve the existing adaptive questioning behavior:
+- strong evidence can increase difficulty
+- partial evidence should target missing concepts
+- weak/unknown evidence should trigger prerequisite recovery
+- do not permanently label a candidate as incapable based on one answer
+
+Keep the existing candidate intelligence profile as the prior/background signal. The new interview evidence should represent current demonstrated ability and should eventually be able to contradict the historical profile.
+
+Keep Breeth integration intact. If Breeth memories are available, they may provide additional context, but the answer evaluator must primarily evaluate the actual current response against the supplied curriculum objectives.
+
+Do not add a database.
+Do not change POST /api/interview.
+Do not expose hidden chain-of-thought.
+Store only concise structured evaluation/evidence.
+
+Add focused tests for:
+1. a strong answer producing demonstrated concepts
+2. a partial answer producing missing concepts
+3. an unknown answer not falsely receiving mastery
+4. mastery state accumulating across multiple answers on the same topic
+5. current interview evidence being able to differ from historical candidate profile
+6. existing adaptive questioning tests remaining valid
+7. Breeth failure still leaving evaluation functional
+```

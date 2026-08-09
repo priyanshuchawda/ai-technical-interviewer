@@ -1,10 +1,11 @@
-import { CandidateProfile, InterviewFeedback, InterviewSessionState, ResponseOutcome } from "../types/interview";
+import { CandidateProfile, InterviewFeedback, InterviewSessionState, ResponseOutcome, TopicMastery } from "../types/interview";
 import { getCurriculumDay } from "./dataService";
 import { breethClient } from "./breethClient";
 import { generateGeminiContent, GeminiMessage } from "./geminiClient";
 import { buildInterviewerSystemPrompt, buildFeedbackSystemPrompt } from "./prompts";
 import { generateCandidateProfile } from "./candidateProfiler";
 import { classifyResponseOutcome } from "./responseClassifier";
+import { evaluateAnswer, updateTopicMastery } from "./answerEvaluator";
 
 // Global session state cache (In-memory for active API sessions)
 const sessions = new Map<string, InterviewSessionState>();
@@ -29,6 +30,7 @@ export function createSession(sessionId: string, candidate: CandidateProfile): I
     history: [],
     done: false,
     intelligenceProfile,
+    masteryState: new Map<number, TopicMastery>(),
   };
   sessions.set(sessionId, state);
   return state;
@@ -131,6 +133,19 @@ export async function processInterviewTurn(
     }
   }
 
+  // 5.5 Evaluate the answer and update mastery state
+  if (messageInput) {
+    const evaluation = evaluateAnswer(messageInput, curriculumDay, session.lastOutcome);
+    const existingMastery = session.masteryState.get(targetDay);
+    const updatedMastery = updateTopicMastery(
+      existingMastery,
+      evaluation,
+      targetDay,
+      curriculumDay?.topics?.[0] || targetMission.title
+    );
+    session.masteryState.set(targetDay, updatedMastery);
+  }
+
   // 6. Generate dynamic turn response using Gemini 3.5 Flash Lite
   let reply = "";
   try {
@@ -167,7 +182,8 @@ async function generateTurnWithGemini(
     session.intelligenceProfile,
     session.lastOutcome,
     session.turnsOnCurrentDay,
-    retrievedMemories
+    retrievedMemories,
+    session.masteryState.get(targetMission.day)
   );
 
   // Build message contents for Gemini
