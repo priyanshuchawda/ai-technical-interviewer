@@ -256,17 +256,43 @@ body {
   border-radius: var(--r-lg);
   overflow: hidden;
 }
-.convo-empty {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 12px; padding: 48px 24px; text-align: center;
+/* Assessment briefing — pre-interview center */
+.briefing {
+  padding: 40px 40px 36px;
+  display: flex; flex-direction: column; gap: 18px;
 }
-.empty-icon {
-  width: 40px; height: 40px; border-radius: 50%;
-  background: var(--surface-2); border: 1px solid var(--line);
-  display: flex; align-items: center; justify-content: center;
+.briefing-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-4);
 }
-.empty-h { font-size: 15px; font-weight: 600; color: var(--ink-1); }
-.empty-p { font-size: 13px; color: var(--ink-3); max-width: 260px; line-height: 1.5; margin-top: 2px; }
+.briefing-candidate {
+  font-size: 22px; font-weight: 700; color: var(--ink-1); letter-spacing: -0.02em;
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+}
+.briefing-role {
+  font-size: 14px; font-weight: 400; color: var(--ink-3); letter-spacing: 0;
+}
+.briefing-desc {
+  font-size: 14px; color: var(--ink-3); line-height: 1.65; max-width: 460px;
+}
+.briefing-meta {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--ink-4); font-weight: 500; flex-wrap: wrap;
+}
+.briefing-sep { color: var(--line-2); }
+.btn-start-main {
+  display: inline-flex; align-items: center;
+  background: var(--blue); color: #fff;
+  border: none; border-radius: var(--r);
+  padding: 11px 22px; font-size: 14px; font-weight: 600;
+  cursor: pointer; font-family: inherit; width: fit-content;
+  transition: background 0.12s; outline: none;
+  margin-top: 4px;
+}
+.btn-start-main:hover:not(:disabled) { background: var(--blue-text); }
+.btn-start-main:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-start-main:focus-visible { box-shadow: 0 0 0 3px rgba(26,107,250,0.2); }
+
 
 .transcript {
   display: flex; flex-direction: column; gap: 0;
