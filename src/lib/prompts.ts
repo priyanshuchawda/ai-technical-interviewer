@@ -1,4 +1,4 @@
-import { CandidateProfile, CandidateIntelligenceProfile, CurriculumDay, Mission, ResponseOutcome, TopicMastery, InterviewFeedback, CodingEvidence } from "../types/interview";
+import { CandidateProfile, CandidateIntelligenceProfile, CurriculumDay, Mission, ResponseOutcome, TopicMastery, InterviewFeedback, CodingEvidence, CodingOpportunity } from "../types/interview";
 import { displayFirstName } from "./pii";
 
 /**
@@ -14,7 +14,8 @@ export function buildInterviewerSystemPrompt(
   turnsOnCurrentDay?: number,
   retrievedMemories?: string[],
   masteryContext?: TopicMastery,
-  codingEvidence?: CodingEvidence[]
+  codingEvidence?: CodingEvidence[],
+  codingOpportunity?: CodingOpportunity
 ): string {
   let profileContext = "";
   if (intelligenceProfile) {
@@ -97,13 +98,17 @@ ${codingEvidence.map((evidence) => evidence.title + ": " + evidence.passed + "/"
 Use this to ask a grounded follow-up about the implementation. Never invent code behavior or expose internal scoring.
 `;
   }
+  const codingOpportunityContext = codingOpportunity ? `
+=== INTERNAL PRACTICAL OPPORTUNITY ===
+A small practical check is available for ${codingOpportunity.title}. Introduce it naturally with wording like "That is a good approach. Let's make that concrete for a moment." Do not force it if the candidate is recovering or the conversation has moved on.
+` : "";
   return `You are a thoughtful senior technical interviewer conducting a live interview for an AI engineering role.
 Candidate: ${displayFirstName(candidate)}
 Role: ${candidate.member.jobRole} (${candidate.member.yearsExperience} years exp)
 
 Missions completed: ${candidate.signals.missionsCompleted}
 Commit days: ${candidate.signals.commitDays}${profileContext}
-${groundingContext}${memoryContext}${masteryStateContext}${codingContext}${adaptiveGuidance}
+${groundingContext}${memoryContext}${masteryStateContext}${codingContext}${codingOpportunityContext}${adaptiveGuidance}
 
 Candidate-facing rules:
 - The internal context above is private. Never mention days, curriculum, cohorts, scores, mastery, adaptive logic, memories, tools, AI, or being an automated interviewer.
@@ -175,3 +180,11 @@ Generate structured assessment feedback as a JSON object matching this exact sch
 Return pure valid JSON with no markdown.`;
 }
 
+
+
+export function buildCodingTaskGenerationPrompt(topic: string, candidateAnswer: string, fallbackTaskId: string): string {
+  return `Generate one small, safe coding-task specification grounded in this interview evidence. Return JSON only.
+Topic: ${topic}
+Candidate claim: ${candidateAnswer.slice(0, 1600)}
+Use the known evaluator contract id ${fallbackTaskId}; preserve its function signature exactly. The task must take 5-15 minutes, require no external dependencies, and never request network access, shell commands, file access, credentials, or arbitrary code execution. Include title, language, context, whyThisTask, instructions, starterCode, functionSignature, evaluationCriteria, difficulty, estimatedMinutes.`;
+}

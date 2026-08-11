@@ -8,7 +8,7 @@ import {
   ResponseOutcome,
 } from "@/types/interview";
 import { generateCandidateProfile } from "@/lib/candidateProfiler";
-import { evaluateCodeSubmission, getCodingTask, CodeEvaluation } from "@/lib/codingTasks";
+import { evaluateCodeSubmission, getCodingTaskById, CodeEvaluation } from "@/lib/codingTasks";
 import candidatesData from "../../candidates.json";
 
 const candidatesList: CandidateProfile[] = (
@@ -16,14 +16,6 @@ const candidatesList: CandidateProfile[] = (
 ).candidates;
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
-
-function getTopicCodingTask(topic: string): ReturnType<typeof getCodingTask> | null {
-  const normalized = topic.toLowerCase();
-  if (normalized.includes("observ") || normalized.includes("logging") || normalized.includes("rag") || normalized.includes("retriev") || normalized.includes("embedding") || normalized.includes("vector")) {
-    return getCodingTask(topic);
-  }
-  return null;
-}
 
 function obTagClass(o: ResponseOutcome | undefined) {
   if (!o) return "ob-tag unknown";
@@ -38,9 +30,9 @@ function obLabel(o: ResponseOutcome | undefined) {
 }
 
 function mbFillColor(s: number): string {
-  if (s >= 0.65) return "var(--green)";
-  if (s >= 0.4) return "var(--blue)";
-  return "var(--red)";
+  if (s >= 0.65) return "var(--mint)";
+  if (s >= 0.4) return "var(--accent)";
+  return "var(--rose)";
 }
 
 /**
@@ -352,7 +344,8 @@ export default function InterviewPage() {
   }, [messages]);
 
   const latestEval = intelligence?.latestEvaluation;
-  const codingTask = getTopicCodingTask(intelligence?.currentTopic || "");
+  const codingOpportunity = intelligence?.codingOpportunity;
+  const codingTask = codingOpportunity ? getCodingTaskById(codingOpportunity.taskId) : null;
   const themeLabel = theme === "light" ? "Dark mode" : "Light mode";
   const voiceLabel = voiceState === "recording" ? "Listening…" : voiceState === "processing" ? "Transcribing…" : voiceState === "transcribed" ? "Transcript ready" : voiceState === "error" || voiceState === "unsupported" ? voiceError || "Try again" : "Speak";
   const reportTopics = intelligence?.masteryScores ?? [];
@@ -515,12 +508,12 @@ export default function InterviewPage() {
             {codingTask && (
               <div className="coding-launch">
               <div>
-                <span className="coding-launch-kicker">Implementation check</span>
-                <strong>Test this concept in code</strong>
-                <span>Optional · relevant to this topic</span>
+                <span className="coding-launch-kicker">Practical check</span>
+                <strong>{codingOpportunity?.title}</strong>
+                <span>{codingOpportunity?.estimatedMinutes} min · {codingOpportunity?.language}</span>
               </div>
               <button type="button" className="coding-launch-button" onClick={() => { setCodingMode(true); setCodeEvaluation(null); setCodeValue(codingTask.starterCode); }}>
-                Open coding task
+                Start implementation
               </button>
             </div>
             )}
@@ -531,9 +524,14 @@ export default function InterviewPage() {
                   <div>
                     <span className="coding-kicker">Coding assessment</span>
                     <h2>{codingTask.title}</h2>
-                    <p>{codingTask.prompt}</p>
+                    <p>{codingTask.context}</p>
+                    <p className="coding-why">Why: {codingTask.whyThisTask}</p>
                   </div>
                   <button type="button" className="coding-close" onClick={() => setCodingMode(false)}>Close</button>
+                </div>
+                <div className="coding-contract">
+                  <span>Function: {codingTask.functionSignature}</span>
+                  <span>Time: {codingTask.estimatedMinutes} minutes</span>
                 </div>
                 <div className="coding-requirements">
                   {codingTask.requirements.map((requirement) => <span key={requirement}>{requirement}</span>)}
@@ -541,7 +539,7 @@ export default function InterviewPage() {
                 <div className="code-editor">
                   <div className="code-editor-bar">
                     <span>{codingTask.language}</span>
-                    <span>deterministic runner</span>
+                    <span>Practical check</span>
                   </div>
                   <textarea aria-label="Code editor" value={codeValue} onChange={(event) => setCodeValue(event.target.value)} spellCheck={false} />
                 </div>
@@ -553,7 +551,7 @@ export default function InterviewPage() {
                   <div className="code-results">
                     <div className="code-results-summary">
                       <strong>{codeEvaluation.passed}/{codeEvaluation.total} checks passed</strong>
-                      <span>{codeEvaluation.executionMs}ms · static deterministic analysis</span>
+                      <span>{codeEvaluation.executionMs}ms · checks complete</span>
                     </div>
                     {codeEvaluation.tests.map((test) => (
                       <div key={test.name} className={"code-test " + (test.passed ? "pass" : "fail")}>
@@ -711,8 +709,8 @@ export default function InterviewPage() {
                 {/* Current Topic */}
                 <div className="drawer-sec">
                   <span className="drawer-eyebrow">Topic</span>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ink-1)" }}>
-                    Day {intelligence.currentTopic}
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>
+                    {intelligence.currentTopic}
                   </div>
                 </div>
 
@@ -781,7 +779,7 @@ export default function InterviewPage() {
                   <div className="why-box">
                     {parseWhy(intelligence.whyThisQuestion).map((r, i) => (
                       <div key={i} style={{ marginBottom: 4 }}>
-                        <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", color: "var(--ink-3)", display: "block" }}>{r.key}</span>
+                        <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", color: "var(--text-3)", display: "block" }}>{r.key}</span>
                         <span>{r.val}</span>
                       </div>
                     ))}
@@ -791,8 +789,8 @@ export default function InterviewPage() {
                 {/* Breeth Memory */}
                 <div className="drawer-sec">
                   <span className="drawer-eyebrow">Memory</span>
-                  <div style={{ fontSize: 12, color: "var(--ink-2)", display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--blue)" }} />
+                  <div style={{ fontSize: 12, color: "var(--text-2)", display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)" }} />
                     <span>
                       {intelligence.masteryScores.length > 0
                         ? `${intelligence.masteryScores.length} topic${intelligence.masteryScores.length !== 1 ? "s" : ""} in session memory`
@@ -823,7 +821,7 @@ export default function InterviewPage() {
                       <span className="plan-num-drawer">{String(i + 1).padStart(2, "0")}</span>
                       <div>
                         <div style={{ fontWeight: 600 }}>{fa.title}</div>
-                        <div style={{ fontSize: 10, color: "var(--ink-3)" }}>{fa.reason}</div>
+                        <div style={{ fontSize: 10, color: "var(--text-3)" }}>{fa.reason}</div>
                       </div>
                     </div>
                   ))}

@@ -25,8 +25,10 @@ describe("deterministic adaptive interview trajectories", () => {
     const sessionId = "trajectory-strong-" + Date.now();
     await processInterviewTurn(sessionId, sarah);
 
+    await processInterviewTurn(sessionId, undefined, "I use structured JSON logs, Prometheus counters, histograms, and trace IDs to measure latency and failures.");
+    expect((await getSession(sessionId))?.codingOpportunity?.taskId).toBe("structured-observability");
+
     const answers = [
-      "I use structured JSON logs, Prometheus counters, histograms, and trace IDs to measure latency and failures.",
       "I would separate metrics from logs, then use correlation IDs to follow a request across retrieval and tool calls.",
       "I use few-shot examples, explicit constraints, and evaluation cases to keep prompts reliable in production.",
       "I would version prompt changes and monitor regressions before shipping them to users.",
@@ -71,6 +73,7 @@ describe("deterministic adaptive interview trajectories", () => {
       recoveryDays.push((await getSession(sessionId))?.currentQuestionDay);
     }
     expect(recoveryDays.slice(0, 3).every((day) => day === initialDay)).toBe(true);
+    expect((await getSession(sessionId))?.codingOpportunity).toBeUndefined();
     expect(recoveryDays[3]).not.toBe(initialDay);
 
     const offTopicSession = "trajectory-offtopic-" + Date.now();

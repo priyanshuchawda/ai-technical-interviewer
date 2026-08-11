@@ -21,7 +21,7 @@ const requiredCopy = [
   "Recommended follow-through",
   "Interview Plan",
   "Thinking through that",
-  "Open coding task",
+  "Start implementation",
   "Speak",
 ];
 
